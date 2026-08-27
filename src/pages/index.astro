@@ -1,15 +1,31 @@
 ---
-// src/pages/index.astro
 import Layout from "../layouts/Layout.astro";
 import Title from "../components/Title.astro";
 import Search from "../components/Search.astro";
 ---
 
-<style></style>
-
-<Layout title="IndexLy - Inicio">
+<Layout title="IndexLy">
   <main>
     <Title />
-	<Search></Search>
+    <Search />
   </main>
+  <footer class="site-footer">
+    <span>IndexLy</span> · Hecho para organizar tu biblioteca. <a href="https://github.com" target="_blank" rel="noopener">Open source</a>
+  </footer>
 </Layout>
+
+<style>
+  main { display: block; }
+  .site-footer {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 18px 20px 32px;
+    text-align: center;
+    color: #52525b;
+    font-size: 0.78rem;
+    border-top: 1px solid #1a1a1f;
+  }
+  .site-footer span { color: #71717a; font-weight: 600; }
+  .site-footer a { color: #71717a; text-decoration: none; border-bottom: 1px solid transparent; }
+  .site-footer a:hover { color: #a1a1aa; border-color: #3f3f46; }
+</style>

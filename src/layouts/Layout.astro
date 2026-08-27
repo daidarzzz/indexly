@@ -1,29 +1,106 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}favicon.svg`} />
+    <link rel="icon" href={`${import.meta.env.BASE_URL}favicon.ico`} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
     <meta name="generator" content={Astro.generator} />
-    <title>Astro Basics</title>
+    <title>{Astro.props.title ?? "IndexLy"}</title>
+    <meta name="description" content="IndexLy — Gestor elegante de índices de juegos. Carga tus JSON, busca y descarga al instante." />
   </head>
   <body>
+    <div class="bg-glow" aria-hidden="true"></div>
+    <div class="bg-grid" aria-hidden="true"></div>
     <slot />
   </body>
 </html>
 
-<style>
-  html,
-  body {
+<style is:global>
+  :root {
+    --bg-0: #08080a;
+    --bg-1: #101012;
+    --bg-2: #17171c;
+    --bg-3: #1e1e26;
+    --bg-4: #252531;
+    --border: #23232b;
+    --border-hover: #7c3aed;
+    --border-strong: #2e2a45;
+    --text-1: #f4f4f5;
+    --text-2: #a1a1aa;
+    --text-3: #71717a;
+    --purple-500: #8b5cf6;
+    --purple-600: #7c3aed;
+    --purple-700: #6d28d9;
+    --purple-soft: rgba(124, 58, 237, 0.12);
+    --purple-glow: 0 8px 32px rgba(124, 58, 237, 0.25);
+    --radius-xl: 20px;
+    --radius-lg: 16px;
+    --radius-md: 12px;
+    --radius-full: 999px;
+  }
+
+  * { box-sizing: border-box; }
+  *::selection { background: rgba(124,58,237,0.35); color: white; }
+
+  html, body {
     margin: 0;
     width: 100%;
-    height: 100%;
+    min-height: 100%;
   }
+
+  html {
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: #3f3f46 var(--bg-0);
+  }
+
   body {
-    font-family:
-      "Gill Sans", "Gill Sans MT", Calibri, "Trebuchet MS", sans-serif;
-    background-color: #293241;
-    color: white;
+    font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg-0);
+    color: var(--text-1);
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg-0); }
+  ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+  .bg-glow {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background:
+      radial-gradient(700px 420px at 50% -10%, rgba(124,58,237,0.18), transparent 70%),
+      radial-gradient(900px 600px at 90% 12%, rgba(168,85,247,0.10), transparent 60%),
+      radial-gradient(600px 400px at 10% 30%, rgba(124,58,237,0.07), transparent 60%);
+  }
+
+  .bg-grid {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.035;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.8) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.8) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 80%);
+  }
+
+  a { color: inherit; }
+
+  /* focus visible */
+  :focus-visible {
+    outline: 2px solid var(--purple-600);
+    outline-offset: 2px;
   }
 </style>

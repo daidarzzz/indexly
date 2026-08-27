@@ -1,28 +1,180 @@
 ---
-
 ---
 
-<div>
-  <h1>Index<span>Ly</span></h1>
-  <p>Sube tu archivo JSON para empezar a buscar...</p>
+<header class="site-header">
+  <nav class="nav">
+    <a href="#" class="logo" aria-label="IndexLy inicio">
+      <span class="logo-mark" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L3 7.5V16.5L12 22L21 16.5V7.5L12 2Z" stroke="white" stroke-width="1.6" stroke-linejoin="round" opacity="0.95"/><path d="M12 22V11.5M3 7.5L12 11.5L21 7.5" stroke="white" stroke-width="1.6" stroke-linejoin="round" opacity="0.4"/><circle cx="12" cy="11.5" r="2.2" fill="#a78bfa"/></svg>
+      </span>
+      <span class="logo-text">Index<span>Ly</span></span>
+      <span class="logo-badge">beta</span>
+    </a>
+    <div class="nav-actions">
+      <a href="https://github.com/daidarzzz/indexly" target="_blank" rel="noopener" class="nav-link">
+        GitHub
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 17L17 7"/><path d="M8 7h9v9"/></svg>
+      </a>
+    </div>
+  </nav>
+</header>
+
+<div class="hero">
+  <div class="hero-badge">
+    <span class="hero-dot"></span>
+    Gestor de índices local & privado
+  </div>
+  <h1>Encuentra <em>todo</em> en segundos.</h1>
+  <p>Carga tus JSON, combina múltiples fuentes y busca entre miles de juegos con un diseño pensado para la velocidad.</p>
 </div>
 
 <style>
-  h1 {
-    font-family:
-      "Gill Sans", "Gill Sans MT", Calibri, "Trebuchet MS", sans-serif;
-    font-size: 9em;
-    text-align: center;
-    color: white;
-    font-weight: bolder;
-    margin: 0px;
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    backdrop-filter: blur(14px) saturate(160%);
+    background: rgba(8,8,10,0.7);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
   }
-  p {
-    text-align: center;
-    font-weight: bold;
-    margin-top: 0px;
+
+  .nav {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
   }
-  span {
-    color: rgb(180, 94, 255);
+
+  .logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: var(--text-1);
+  }
+
+  .logo-mark {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, #1a1625, #211e36);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+
+  .logo-text {
+    font-weight: 800;
+    font-size: 1.15rem;
+    letter-spacing: -0.03em;
+  }
+  .logo-text span {
+    background: linear-gradient(135deg, #8b5cf6, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .logo-badge {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #a1a1aa;
+    background: #1a1a1f;
+    border: 1px solid var(--border);
+    padding: 2px 6px;
+    border-radius: 999px;
+  }
+
+  .nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-2);
+    text-decoration: none;
+    border: 1px solid transparent;
+    padding: 6px 10px;
+    border-radius: 999px;
+    transition: all 0.18s ease;
+  }
+  .nav-link:hover {
+    color: var(--text-1);
+    background: var(--bg-2);
+    border-color: var(--border);
+  }
+
+  .hero {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 42px 20px 12px;
+    text-align: center;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-2);
+    letter-spacing: 0.01em;
+    background: rgba(124,58,237,0.08);
+    border: 1px solid rgba(124,58,237,0.18);
+    padding: 6px 12px;
+    border-radius: 999px;
+  }
+
+  .hero-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 10px rgba(34,197,94,0.5);
+  }
+
+  .hero h1 {
+    margin: 18px 0 10px;
+    font-size: clamp(2rem, 5vw, 2.75rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+    color: var(--text-1);
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 55%, #ddd6fe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero p {
+    margin: 0 auto;
+    max-width: 520px;
+    color: var(--text-2);
+    font-size: 0.98rem;
+    line-height: 1.6;
+    font-weight: 400;
+  }
+
+  @media (max-width: 640px) {
+    .nav { padding: 12px 16px; }
+    .hero { padding: 28px 16px 8px; }
+    .logo-badge { display: none; }
   }
 </style>

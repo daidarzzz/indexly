@@ -3,46 +3,58 @@
 ---
 
 <div class="Search">
-  <!-- GESTOR DE ÍNDICES MEJORADO -->
+  <!-- GESTOR DE ÍNDICES -->
   <div class="index-manager-card">
     <div class="manager-header">
-      <div>
-        <h3>📂 Gestor de Índices</h3>
-        <p class="manager-desc">Administra tus fuentes de juegos.</p>
+      <div class="manager-title">
+        <div class="manager-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"><path d="M22 12H14l-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6l2 2h8a2 2 0 0 1 2 2v4Z"/><path d="M14 14v6H4a2 2 0 0 1-2-2v-6"/></svg>
+        </div>
+        <div>
+          <h3>Gestor de índices</h3>
+          <p class="manager-desc">Activa, desactiva o elimina tus fuentes.</p>
+        </div>
       </div>
-      <label for="json-input" class="file-label"> ➕ Añadir JSON(s) </label>
+      <label for="json-input" class="file-label">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        Añadir JSON
+      </label>
       <input type="file" id="json-input" accept=".json" multiple />
     </div>
 
-    <!-- Lista de índices cargados -->
     <div id="indexes-list" class="indexes-grid-list">
       <p class="no-indexes">No hay índices cargados todavía.</p>
     </div>
   </div>
 
-  <!-- BARRA DE BÚSQUEDA -->
-  <input
-    type="text"
-    id="search-input"
-    placeholder="Escribe para buscar juegos..."
-    disabled
-  />
+  <!-- BUSCADOR -->
+  <div class="search-wrap">
+    <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input
+      type="text"
+      id="search-input"
+      placeholder="Escribe para buscar juegos..."
+      disabled
+      autocomplete="off"
+      spellcheck="false"
+    />
+    <span class="search-hint">/</span>
+  </div>
 
-  <!-- CONTADOR Y ESTADO -->
+  <!-- CONTADOR -->
   <div id="stats-container" class="stats-container"></div>
 
   <!-- RESULTADOS -->
   <div id="results" class="results-grid"></div>
 
-  <!-- BOTÓN CARGAR MÁS -->
-  <button id="load-more-btn" class="load-more-btn" style="display: none;"
-    >Cargar más juegos</button
-  >
+  <button id="load-more-btn" class="load-more-btn" style="display: none;">Cargar más</button>
+
+  <p class="footer-note">Todo se guarda localmente en tu navegador. Nada se envía a servidores.</p>
 </div>
 
 <script>
   import { parseGameJson } from "../utils/gameParser";
-  import { get, set } from "idb-keyval"; // Importamos IndexedDB súper limpio
+  import { get, set } from "idb-keyval";
 
   let indexes = [];
   let currentFilteredGames = [];
@@ -55,12 +67,10 @@
   const loadMoreBtn = document.getElementById("load-more-btn");
   const statsContainer = document.getElementById("stats-container");
 
-  // --- PERSISTENCIA ELEGANTE CON INDEXEDDB ---
   async function loadStoredIndexes() {
     try {
       const saved = await get("indexly_saved_indexes");
       if (saved) {
-        // Volvemos a parsear los juegos a partir del JSON original guardado
         indexes = saved.map((item) => {
           const parsedGames = parseGameJson(item.rawData);
           return {
@@ -71,7 +81,6 @@
             games: parsedGames,
           };
         });
-
         if (indexes.length > 0) {
           searchInput.removeAttribute("disabled");
         }
@@ -88,54 +97,40 @@
         id: idx.id,
         name: idx.name,
         active: idx.active,
-        rawData: idx.rawData, // Guardamos el JSON crudo sin miedo al límite de espacio
+        rawData: idx.rawData,
       }));
       await set("indexly_saved_indexes", dataToSave);
     } catch (e) {
       console.error("Error al guardar en IndexedDB:", e);
-      alert(
-        "⚠️ Hubo un error al guardar los índices en la base de datos del navegador.",
-      );
+      alert("⚠️ Hubo un error al guardar los índices en la base de datos del navegador.");
     }
   }
 
-  // 1. CARGA MÚLTIPLE Y DETECCIÓN DE DUPLICADOS
   fileInput.addEventListener("change", async (event) => {
     const target = event.target;
     if (!target.files || target.files.length === 0) return;
-
     const files = Array.from(target.files);
     target.value = "";
-
     let addedCount = 0;
     let duplicateNames = [];
-
     for (const file of files) {
       try {
         const text = await file.text();
         const rawData = JSON.parse(text);
-
         const parsedGames = parseGameJson(rawData);
         const indexName = rawData.name || file.name.replace(".json", "");
-
-        const exists = indexes.some(
-          (idx) => idx.name.toLowerCase() === indexName.toLowerCase(),
-        );
-
+        const exists = indexes.some((idx) => idx.name.toLowerCase() === indexName.toLowerCase());
         if (exists) {
           duplicateNames.push(indexName);
           continue;
         }
-
         const newIndex = {
-          id:
-            Date.now().toString() + Math.random().toString(36).substring(2, 7),
+          id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
           name: indexName,
           active: true,
           rawData: rawData,
           games: parsedGames,
         };
-
         indexes.push(newIndex);
         addedCount++;
       } catch (error) {
@@ -143,21 +138,16 @@
         alert(`❌ Error al procesar "${file.name}". Revisa la consola (F12).`);
       }
     }
-
     if (duplicateNames.length > 0) {
-      alert(
-        `⚠️ Los siguientes índices ya estaban cargados y se han omitido:\n• ${duplicateNames.join("\n• ")}`,
-      );
+      alert(`⚠️ Los siguientes índices ya estaban cargados y se han omitido:\n• ${duplicateNames.join("\n• ")}`);
     }
-
     if (addedCount > 0) {
       searchInput.removeAttribute("disabled");
-      await saveIndexesToStorage(); // Guardado asíncrono robusto
+      await saveIndexesToStorage();
       updateApp();
     }
   });
 
-  // 2. ACTIVAR / DESACTIVAR / BORRAR ÍNDICES
   window.toggleIndex = async function (id) {
     const idx = indexes.find((i) => i.id === id);
     if (idx) {
@@ -177,37 +167,27 @@
     updateApp();
   };
 
-  // 3. ACTUALIZAR ESTADO GENERAL
   function updateApp() {
     renderIndexesManager();
-
     let activeGames = [];
     indexes.forEach((index) => {
-      if (index.active) {
-        activeGames = activeGames.concat(index.games);
-      }
+      if (index.active) activeGames = activeGames.concat(index.games);
     });
-
     const query = searchInput.value.toLowerCase();
     if (query.trim() === "") {
       currentFilteredGames = activeGames;
     } else {
-      currentFilteredGames = activeGames.filter((game) =>
-        game.title.toLowerCase().includes(query),
-      );
+      currentFilteredGames = activeGames.filter((game) => game.title.toLowerCase().includes(query));
     }
-
     visibleCount = 50;
     renderCurrentView();
   }
 
-  // 4. RENDERIZAR GESTOR DE ÍNDICES
   function renderIndexesManager() {
     if (indexes.length === 0) {
-      indexesListContainer.innerHTML = `<p class="no-indexes">No hay índices cargados todavía.</p>`;
+      indexesListContainer.innerHTML = `<div class="empty-state"><div class="empty-icon">◇</div><p class="no-indexes">Sin fuentes aún.<br><span>Sube uno o varios .json para empezar.</span></p></div>`;
       return;
     }
-
     indexesListContainer.innerHTML = indexes
       .map(
         (index) => `
@@ -215,7 +195,7 @@
         <div class="index-pill-info">
           <span class="status-dot"></span>
           <div class="index-text">
-            <strong>${index.name}</strong>
+            <strong>${escapeHtml(index.name)}</strong>
             <small>${index.games.length} juegos</small>
           </div>
         </div>
@@ -223,7 +203,7 @@
           <button class="action-btn toggle" onclick="toggleIndex('${index.id}')" title="${index.active ? "Desactivar" : "Activar"}">
             ${index.active ? "Desactivar" : "Activar"}
           </button>
-          <button class="action-btn delete" onclick="removeIndex('${index.id}')" title="Eliminar índice">
+          <button class="action-btn delete" onclick="removeIndex('${index.id}')" title="Eliminar índice" aria-label="Eliminar">
             ✕
           </button>
         </div>
@@ -233,7 +213,12 @@
       .join("");
   }
 
-  // 5. RENDERIZAR RESULTADOS
+  function escapeHtml(str) {
+    const d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
   function renderCurrentView() {
     if (indexes.length === 0) {
       resultsContainer.innerHTML = "";
@@ -242,368 +227,502 @@
       searchInput.placeholder = "Sube un JSON arriba para empezar...";
       return;
     }
-
     const totalMatches = currentFilteredGames.length;
-    searchInput.placeholder = `Buscando entre ${totalMatches} juegos activos...`;
+    searchInput.placeholder = `Buscar entre ${totalMatches} juegos…`;
 
     if (totalMatches === 0) {
-      resultsContainer.innerHTML = `<p class="no-results">No se han encontrado juegos.</p>`;
+      const q = searchInput.value.trim();
+      resultsContainer.innerHTML = `<div class="empty-results"><p class="no-results">${q ? `Sin resultados para “${escapeHtml(q)}”` : "No hay juegos en los índices activos."}</p><span>Prueba con otro término o activa más fuentes.</span></div>`;
       statsContainer.innerHTML = "";
       loadMoreBtn.style.display = "none";
       return;
     }
 
-    statsContainer.innerHTML = `Mostrando ${Math.min(visibleCount, totalMatches)} de ${totalMatches} resultados`;
+    statsContainer.innerHTML = `<span class="stats-dot"></span> Mostrando <strong>${Math.min(visibleCount, totalMatches)}</strong> de <strong>${totalMatches}</strong> resultados`;
 
     const gamesToRender = currentFilteredGames.slice(0, visibleCount);
-
     resultsContainer.innerHTML = gamesToRender
       .map(
         (game) => `
       <div class="game-card">
         <div class="game-info-container">
-          <h3>${game.title}</h3>
+          <h3>${escapeHtml(game.title)}</h3>
           <p class="game-meta">
-            <span class="source-badge">${game.source}</span> &bull; 
-            <span>Peso:</span> ${game.fileSize}
+            <span class="source-badge">${escapeHtml(game.source)}</span>
+            <span class="meta-dot">·</span>
+            <span>${escapeHtml(game.fileSize)}</span>
           </p>
         </div>
-        ${game.link ? `<a href="${game.link}" target="_blank" class="magnet-link">Descargar</a>` : '<span class="no-magnet">Sin enlace</span>'}
+        ${game.link ? `<a href="${escapeHtml(game.link)}" target="_blank" rel="noopener" class="magnet-link">Descargar <span aria-hidden="true">↗</span></a>` : '<span class="no-magnet">Sin enlace</span>'}
       </div>
     `,
       )
       .join("");
 
-    if (visibleCount < totalMatches) {
-      loadMoreBtn.style.display = "block";
-    } else {
-      loadMoreBtn.style.display = "none";
-    }
+    loadMoreBtn.style.display = visibleCount < totalMatches ? "inline-flex" : "none";
   }
 
-  searchInput.addEventListener("input", () => {
-    updateApp();
-  });
-
+  searchInput.addEventListener("input", () => updateApp());
   loadMoreBtn.addEventListener("click", () => {
     visibleCount += 50;
     renderCurrentView();
   });
 
-  // Cargar al iniciar la página
+  // shortcut "/" to focus search
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "/" && document.activeElement !== searchInput && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      searchInput.focus();
+    }
+  });
+
   loadStoredIndexes();
 </script>
 
 <style>
   .Search {
-    text-align: center;
-    font-size: 1rem;
-    margin: 10px auto;
-    padding: 10px;
-    max-width: 900px;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 18px 20px 48px;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
   }
 
+  /* Card gestor */
   .index-manager-card {
-    background: #1e293b;
-    border: 1px solid #334155;
-    padding: 1.5rem;
-    border-radius: 16px;
-    width: 80%;
-    margin-bottom: 25px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 18px;
     text-align: left;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.35);
   }
 
   .manager-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-wrap: wrap;
     gap: 1rem;
-    border-bottom: 1px solid #334155;
-    padding-bottom: 1rem;
-    margin-bottom: 1rem;
+    padding-bottom: 16px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
   }
 
-  .manager-header h3 {
-    margin: 0 0 0.2rem 0;
-    color: #f8fafc;
-    font-size: 1.25rem;
-  }
-
-  .manager-desc {
-    color: #94a3b8;
-    font-size: 0.85rem;
-    margin: 0;
-  }
-
-  .file-label {
-    background: linear-gradient(135deg, #7c3aed, #9333ea);
-    color: white;
-    padding: 0.6rem 1.2rem;
-    border-radius: 10px;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.9rem;
-    transition: all 0.2s ease;
-    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
-  }
-
-  .file-label:hover {
-    background: linear-gradient(135deg, #6d28d9, #7e22ce);
-    transform: translateY(-1px);
-  }
-
-  #json-input {
-    display: none;
-  }
-
-  .indexes-grid-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  /* --- AQUÍ ESTÁ EL CAMBIO: Usamos :global() para que los elementos creados por JS cojan los estilos --- */
-  :global(.index-pill) {
-    background: #0f172a;
-    border: 1px solid #334155;
-    padding: 0.75rem 1rem;
-    border-radius: 10px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    transition: all 0.2s ease;
-  }
-
-  :global(.index-pill.inactive) {
-    opacity: 0.45;
-    border-style: dashed;
-  }
-
-  :global(.index-pill-info) {
+  .manager-title {
     display: flex;
     align-items: center;
     gap: 12px;
   }
 
-  :global(.status-dot) {
-    width: 10px;
-    height: 10px;
-    background-color: #ef4444;
-    border-radius: 50%;
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+  .manager-icon {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    background: #1a1a20;
+    border: 1px solid var(--border);
+    border-radius: 10px;
   }
 
-  :global(.index-pill.active .status-dot) {
-    background-color: #22c55e;
-    box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
-  }
-
-  :global(.index-text) {
-    display: flex;
-    flex-direction: column;
-  }
-
-  :global(.index-text strong) {
-    color: #f8fafc;
-    font-size: 0.95rem;
-  }
-
-  :global(.index-text small) {
-    color: #94a3b8;
-    font-size: 0.75rem;
-  }
-
-  :global(.index-pill-actions) {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  :global(.action-btn) {
-    border: none;
-    padding: 0.4rem 0.8rem;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.8rem;
-    font-weight: 600;
-    transition: all 0.2s;
-  }
-
-  :global(.action-btn.toggle) {
-    background: #334155;
-    color: #cbd5e1;
-  }
-
-  :global(.action-btn.toggle:hover) {
-    background: #475569;
-    color: white;
-  }
-
-  :global(.action-btn.delete) {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
-    padding: 0.4rem 0.6rem;
-  }
-
-  :global(.action-btn.delete:hover) {
-    background: #ef4444;
-    color: white;
-  }
-
-  :global(.no-indexes) {
-    color: #64748b;
-    font-size: 0.85rem;
-    font-style: italic;
+  .manager-header h3 {
     margin: 0;
-    text-align: center;
-    padding: 1rem;
+    color: var(--text-1);
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
   }
 
-  /* BUSCADOR */
-  #search-input {
-    padding: 12px 20px;
-    margin-top: 10px;
-    border-radius: 50px;
-    background-color: #1e293b;
-    border: 2px solid #334155;
+  .manager-desc {
+    color: var(--text-2);
+    font-size: 0.8rem;
+    margin: 2px 0 0;
+  }
+
+  .file-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: linear-gradient(135deg, #7c3aed, #8b5cf6);
     color: white;
-    width: 80%;
-    font-size: 1rem;
-    outline: none;
-    transition: all 0.2s;
-  }
-
-  #search-input:focus {
-    border-color: #a855f7;
-    box-shadow: 0 0 10px rgba(168, 85, 247, 0.2);
-  }
-
-  #search-input:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  .stats-container {
-    margin-top: 15px;
-    color: #94a3b8;
+    padding: 9px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-weight: 600;
     font-size: 0.85rem;
+    letter-spacing: -0.01em;
+    transition: all 0.18s ease;
+    box-shadow: 0 4px 16px rgba(124,58,237,0.35);
+    white-space: nowrap;
+    user-select: none;
   }
+  .file-label:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(124,58,237,0.45);
+    background: linear-gradient(135deg, #6d28d9, #7c3aed);
+  }
+  .file-label:active { transform: translateY(0); }
 
-  /* RESULTADOS */
-  .results-grid {
-    margin-top: 15px;
+  #json-input { display: none; }
+
+  .indexes-grid-list {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    text-align: left;
-    width: 80%;
+    gap: 0.6rem;
+    min-height: 42px;
   }
 
-  :global(.game-card) {
-    background: #1e293b;
-    border: 1px solid #334155;
-    padding: 1.25rem;
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 18px 12px 6px;
+    text-align: center;
+  }
+  .empty-icon {
+    width: 32px; height: 32px;
+    display: grid; place-items: center;
+    border: 1px dashed #2a2a33;
+    border-radius: 8px;
+    color: #3f3f46;
+    font-size: 1.1rem;
+  }
+
+  :global(.index-pill) {
+    background: #0e0e11;
+    border: 1px solid var(--border);
+    padding: 10px 12px;
     border-radius: 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 1rem;
-    transition:
-      transform 0.2s ease,
-      border-color 0.2s ease,
-      box-shadow 0.2s ease;
+    gap: 0.75rem;
+    transition: all 0.18s ease;
+  }
+  :global(.index-pill.active) {
+    border-color: rgba(124,58,237,0.35);
+    background: #12121a;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+  }
+  :global(.index-pill.inactive) {
+    opacity: 0.55;
+    border-style: dashed;
+  }
+  :global(.index-pill-info) { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  :global(.status-dot) {
+    width: 8px; height: 8px;
+    background: #71717a;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+  :global(.index-pill.active .status-dot) {
+    background: #22c55e;
+    box-shadow: 0 0 8px rgba(34,197,94,0.6);
+  }
+  :global(.index-pill.inactive .status-dot) {
+    background: #52525b;
+    box-shadow: none;
+  }
+  :global(.index-text) { display: flex; flex-direction: column; min-width: 0; }
+  :global(.index-text strong) {
+    color: var(--text-1);
+    font-size: 0.88rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 22ch;
+  }
+  :global(.index-text small) { color: var(--text-2); font-size: 0.72rem; }
+  :global(.index-pill-actions) { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  :global(.action-btn) {
+    border: 1px solid transparent;
+    padding: 6px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 600;
+    transition: all 0.16s;
+    line-height: 1;
+  }
+  :global(.action-btn.toggle) {
+    background: var(--bg-3);
+    color: var(--text-2);
+    border-color: var(--border);
+  }
+  :global(.action-btn.toggle:hover) {
+    background: var(--bg-4);
+    color: var(--text-1);
+    border-color: #3f3f46;
+  }
+  :global(.index-pill.active .action-btn.toggle) {
+    background: rgba(124,58,237,0.14);
+    color: #c4b5fd;
+    border-color: rgba(124,58,237,0.25);
+  }
+  :global(.action-btn.delete) {
+    background: transparent;
+    color: #71717a;
+    padding: 6px 8px;
+    border-color: transparent;
+  }
+  :global(.action-btn.delete:hover) {
+    background: rgba(239,68,68,0.12);
+    color: #fb7185;
   }
 
-  :global(.game-card:hover) {
-    border-color: #a855f7;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 20px rgba(168, 85, 247, 0.15);
-  }
-
-  :global(.game-info-container) {
-    flex: 1;
-  }
-
-  :global(.game-card h3) {
-    margin: 0 0 0.4rem 0;
-    color: #f8fafc;
-    font-size: 1.15rem;
-  }
-
-  .game-meta {
+  :global(.no-indexes) {
+    color: var(--text-3);
     font-size: 0.85rem;
-    color: #94a3b8;
+    margin: 0;
+    text-align: center;
+    line-height: 1.5;
+  }
+  :global(.no-indexes span) { color: var(--text-2); font-size: 0.8rem; }
+
+  /* Buscador */
+  .search-wrap {
+    position: relative;
+    margin-top: 18px;
+    width: 100%;
+  }
+  .search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+  .search-hint {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.7rem;
+    color: #71717a;
+    background: #1a1a1f;
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    padding: 3px 7px;
+    border-radius: 6px;
+    pointer-events: none;
+  }
+  #search-input {
+    width: 100%;
+    padding: 14px 44px 14px 42px;
+    border-radius: 999px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    color: var(--text-1);
+    font-size: 0.95rem;
+    font-weight: 400;
+    outline: none;
+    transition: all 0.18s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+  #search-input::placeholder { color: var(--text-3); }
+  #search-input:focus {
+    border-color: rgba(124,58,237,0.6);
+    background: #14141c;
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.18), 0 8px 24px rgba(0,0,0,0.3);
+  }
+  #search-input:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .stats-container {
+    margin-top: 12px;
+    color: var(--text-2);
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 18px;
+  }
+  .stats-container strong { color: var(--text-1); font-weight: 600; }
+  .stats-dot {
+    width: 5px; height: 5px;
+    background: var(--purple-500);
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  /* Resultados */
+  .results-grid {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    text-align: left;
+    width: 100%;
+  }
+
+  :global(.game-card) {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    padding: 14px 14px 14px 16px;
+    border-radius: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.18s ease;
+  }
+  :global(.game-card:hover) {
+    border-color: rgba(124,58,237,0.4);
+    background: #14141e;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  }
+  :global(.game-info-container) { flex: 1; min-width: 0; }
+  :global(.game-card h3) {
+    margin: 0 0 6px 0;
+    color: var(--text-1);
+    font-size: 0.92rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  :global(.game-meta) {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+    font-size: 0.78rem;
+    color: var(--text-2);
     margin: 0;
   }
-
-  .source-badge {
-    background: #334155;
-    color: #e2e8f0;
-    padding: 0.1rem 0.5rem;
-    border-radius: 4px;
+  :global(.source-badge) {
+    background: rgba(124,58,237,0.14);
+    color: #c4b5fd;
+    border: 1px solid rgba(124,58,237,0.22);
+    padding: 2px 7px;
+    border-radius: 999px;
     font-weight: 600;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.01em;
+    max-width: 18ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-
+  :global(.meta-dot) { color: var(--text-3); }
   :global(.magnet-link) {
-    background: linear-gradient(135deg, #7c3aed, #9333ea);
-    color: white;
-    padding: 0.6rem 1.2rem;
-    border-radius: 8px;
+    background: #f4f4f5;
+    color: #09090b;
+    padding: 8px 14px;
+    border-radius: 999px;
     text-decoration: none;
     font-weight: 600;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
     opacity: 0;
     visibility: hidden;
-    transform: translateX(10px);
-    transition: all 0.25s ease-in-out;
-    box-shadow: 0 2px 10px rgba(124, 58, 237, 0.4);
+    transform: translateX(8px);
+    transition:
+      opacity 0.2s ease,
+      transform 0.2s ease,
+      visibility 0.2s ease,
+      background 0.18s ease,
+      box-shadow 0.18s ease;
+    pointer-events: none;
   }
-
-  :global(.game-card:hover .magnet-link) {
+  :global(.game-card:hover .magnet-link),
+  :global(.game-card:focus-within .magnet-link) {
     opacity: 1;
     visibility: visible;
     transform: translateX(0);
+    pointer-events: auto;
   }
-
   :global(.magnet-link:hover) {
-    background: linear-gradient(135deg, #6d28d9, #7e22ce);
-    box-shadow: 0 4px 15px rgba(124, 58, 237, 0.6);
+    background: white;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.3);
   }
-
+  /* Touch / sin hover: siempre visible para no bloquear descarga */
+  @media (hover: none) {
+    :global(.magnet-link) {
+      opacity: 1;
+      visibility: visible;
+      transform: none;
+      pointer-events: auto;
+    }
+  }
   :global(.no-magnet) {
-    font-size: 0.85rem;
-    color: #ef4444;
+    font-size: 0.78rem;
+    color: #71717a;
     font-weight: 500;
-    opacity: 0.5;
+    flex-shrink: 0;
+    border: 1px dashed var(--border);
+    padding: 6px 10px;
+    border-radius: 999px;
   }
-
-  .no-results {
+  :global(.empty-results) {
     text-align: center;
-    color: #94a3b8;
-    padding: 2rem;
+    padding: 28px 16px;
+    background: var(--bg-1);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-lg);
   }
+  :global(.no-results) {
+    color: var(--text-1);
+    font-weight: 600;
+    margin: 0 0 6px;
+    font-size: 0.92rem;
+  }
+  :global(.empty-results span) { color: var(--text-2); font-size: 0.82rem; }
 
   .load-more-btn {
-    margin-top: 25px;
-    background: #1e293b;
-    border: 1px solid #7c3aed;
-    color: #a855f7;
-    padding: 0.75rem 1.5rem;
-    border-radius: 8px;
+    margin: 18px auto 0;
+    background: transparent;
+    border: 1px solid rgba(124,58,237,0.35);
+    color: #c4b5fd;
+    padding: 10px 22px;
+    border-radius: 999px;
     font-weight: 600;
+    font-size: 0.88rem;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.18s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .load-more-btn:hover {
+    background: var(--purple-600);
+    color: white;
+    border-color: var(--purple-600);
+    box-shadow: var(--purple-glow);
   }
 
-  .load-more-btn:hover {
-    background: #7c3aed;
-    color: white;
+  .footer-note {
+    margin: 28px 0 0;
+    text-align: center;
+    color: var(--text-3);
+    font-size: 0.75rem;
+    letter-spacing: 0.01em;
+  }
+
+  @media (max-width: 640px) {
+    .Search { padding: 14px 16px 40px; }
+    .index-manager-card { padding: 14px; border-radius: 16px; }
+    .manager-header { gap: 0.75rem; }
+    :global(.game-card) { flex-direction: column; align-items: stretch; }
+    :global(.no-magnet) { width: 100%; justify-content: center; }
+    /* en móvil el botón ocupa todo el ancho pero mantiene lógica de hover:none arriba */
+    :global(.magnet-link) { width: 100%; justify-content: center; }
+    :global(.index-text strong) { max-width: 16ch; }
   }
 </style>
