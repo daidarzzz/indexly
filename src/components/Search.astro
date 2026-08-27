@@ -1,0 +1,609 @@
+---
+// src/components/Search.astro
+---
+
+<div class="Search">
+  <!-- GESTOR DE ÍNDICES MEJORADO -->
+  <div class="index-manager-card">
+    <div class="manager-header">
+      <div>
+        <h3>📂 Gestor de Índices</h3>
+        <p class="manager-desc">Administra tus fuentes de juegos.</p>
+      </div>
+      <label for="json-input" class="file-label"> ➕ Añadir JSON(s) </label>
+      <input type="file" id="json-input" accept=".json" multiple />
+    </div>
+
+    <!-- Lista de índices cargados -->
+    <div id="indexes-list" class="indexes-grid-list">
+      <p class="no-indexes">No hay índices cargados todavía.</p>
+    </div>
+  </div>
+
+  <!-- BARRA DE BÚSQUEDA -->
+  <input
+    type="text"
+    id="search-input"
+    placeholder="Escribe para buscar juegos..."
+    disabled
+  />
+
+  <!-- CONTADOR Y ESTADO -->
+  <div id="stats-container" class="stats-container"></div>
+
+  <!-- RESULTADOS -->
+  <div id="results" class="results-grid"></div>
+
+  <!-- BOTÓN CARGAR MÁS -->
+  <button id="load-more-btn" class="load-more-btn" style="display: none;"
+    >Cargar más juegos</button
+  >
+</div>
+
+<script>
+  import { parseGameJson } from "../utils/gameParser";
+  import { get, set } from "idb-keyval"; // Importamos IndexedDB súper limpio
+
+  let indexes = [];
+  let currentFilteredGames = [];
+  let visibleCount = 50;
+
+  const fileInput = document.getElementById("json-input");
+  const searchInput = document.getElementById("search-input");
+  const resultsContainer = document.getElementById("results");
+  const indexesListContainer = document.getElementById("indexes-list");
+  const loadMoreBtn = document.getElementById("load-more-btn");
+  const statsContainer = document.getElementById("stats-container");
+
+  // --- PERSISTENCIA ELEGANTE CON INDEXEDDB ---
+  async function loadStoredIndexes() {
+    try {
+      const saved = await get("indexly_saved_indexes");
+      if (saved) {
+        // Volvemos a parsear los juegos a partir del JSON original guardado
+        indexes = saved.map((item) => {
+          const parsedGames = parseGameJson(item.rawData);
+          return {
+            id: item.id,
+            name: item.name,
+            active: item.active,
+            rawData: item.rawData,
+            games: parsedGames,
+          };
+        });
+
+        if (indexes.length > 0) {
+          searchInput.removeAttribute("disabled");
+        }
+      }
+    } catch (e) {
+      console.error("Error al cargar los índices desde IndexedDB:", e);
+    }
+    updateApp();
+  }
+
+  async function saveIndexesToStorage() {
+    try {
+      const dataToSave = indexes.map((idx) => ({
+        id: idx.id,
+        name: idx.name,
+        active: idx.active,
+        rawData: idx.rawData, // Guardamos el JSON crudo sin miedo al límite de espacio
+      }));
+      await set("indexly_saved_indexes", dataToSave);
+    } catch (e) {
+      console.error("Error al guardar en IndexedDB:", e);
+      alert(
+        "⚠️ Hubo un error al guardar los índices en la base de datos del navegador.",
+      );
+    }
+  }
+
+  // 1. CARGA MÚLTIPLE Y DETECCIÓN DE DUPLICADOS
+  fileInput.addEventListener("change", async (event) => {
+    const target = event.target;
+    if (!target.files || target.files.length === 0) return;
+
+    const files = Array.from(target.files);
+    target.value = "";
+
+    let addedCount = 0;
+    let duplicateNames = [];
+
+    for (const file of files) {
+      try {
+        const text = await file.text();
+        const rawData = JSON.parse(text);
+
+        const parsedGames = parseGameJson(rawData);
+        const indexName = rawData.name || file.name.replace(".json", "");
+
+        const exists = indexes.some(
+          (idx) => idx.name.toLowerCase() === indexName.toLowerCase(),
+        );
+
+        if (exists) {
+          duplicateNames.push(indexName);
+          continue;
+        }
+
+        const newIndex = {
+          id:
+            Date.now().toString() + Math.random().toString(36).substring(2, 7),
+          name: indexName,
+          active: true,
+          rawData: rawData,
+          games: parsedGames,
+        };
+
+        indexes.push(newIndex);
+        addedCount++;
+      } catch (error) {
+        console.error(`Error al procesar el archivo ${file.name}:`, error);
+        alert(`❌ Error al procesar "${file.name}". Revisa la consola (F12).`);
+      }
+    }
+
+    if (duplicateNames.length > 0) {
+      alert(
+        `⚠️ Los siguientes índices ya estaban cargados y se han omitido:\n• ${duplicateNames.join("\n• ")}`,
+      );
+    }
+
+    if (addedCount > 0) {
+      searchInput.removeAttribute("disabled");
+      await saveIndexesToStorage(); // Guardado asíncrono robusto
+      updateApp();
+    }
+  });
+
+  // 2. ACTIVAR / DESACTIVAR / BORRAR ÍNDICES
+  window.toggleIndex = async function (id) {
+    const idx = indexes.find((i) => i.id === id);
+    if (idx) {
+      idx.active = !idx.active;
+      await saveIndexesToStorage();
+      updateApp();
+    }
+  };
+
+  window.removeIndex = async function (id) {
+    indexes = indexes.filter((i) => i.id !== id);
+    if (indexes.length === 0) {
+      searchInput.setAttribute("disabled", "true");
+      searchInput.value = "";
+    }
+    await saveIndexesToStorage();
+    updateApp();
+  };
+
+  // 3. ACTUALIZAR ESTADO GENERAL
+  function updateApp() {
+    renderIndexesManager();
+
+    let activeGames = [];
+    indexes.forEach((index) => {
+      if (index.active) {
+        activeGames = activeGames.concat(index.games);
+      }
+    });
+
+    const query = searchInput.value.toLowerCase();
+    if (query.trim() === "") {
+      currentFilteredGames = activeGames;
+    } else {
+      currentFilteredGames = activeGames.filter((game) =>
+        game.title.toLowerCase().includes(query),
+      );
+    }
+
+    visibleCount = 50;
+    renderCurrentView();
+  }
+
+  // 4. RENDERIZAR GESTOR DE ÍNDICES
+  function renderIndexesManager() {
+    if (indexes.length === 0) {
+      indexesListContainer.innerHTML = `<p class="no-indexes">No hay índices cargados todavía.</p>`;
+      return;
+    }
+
+    indexesListContainer.innerHTML = indexes
+      .map(
+        (index) => `
+      <div class="index-pill ${index.active ? "active" : "inactive"}">
+        <div class="index-pill-info">
+          <span class="status-dot"></span>
+          <div class="index-text">
+            <strong>${index.name}</strong>
+            <small>${index.games.length} juegos</small>
+          </div>
+        </div>
+        <div class="index-pill-actions">
+          <button class="action-btn toggle" onclick="toggleIndex('${index.id}')" title="${index.active ? "Desactivar" : "Activar"}">
+            ${index.active ? "Desactivar" : "Activar"}
+          </button>
+          <button class="action-btn delete" onclick="removeIndex('${index.id}')" title="Eliminar índice">
+            ✕
+          </button>
+        </div>
+      </div>
+    `,
+      )
+      .join("");
+  }
+
+  // 5. RENDERIZAR RESULTADOS
+  function renderCurrentView() {
+    if (indexes.length === 0) {
+      resultsContainer.innerHTML = "";
+      statsContainer.innerHTML = "";
+      loadMoreBtn.style.display = "none";
+      searchInput.placeholder = "Sube un JSON arriba para empezar...";
+      return;
+    }
+
+    const totalMatches = currentFilteredGames.length;
+    searchInput.placeholder = `Buscando entre ${totalMatches} juegos activos...`;
+
+    if (totalMatches === 0) {
+      resultsContainer.innerHTML = `<p class="no-results">No se han encontrado juegos.</p>`;
+      statsContainer.innerHTML = "";
+      loadMoreBtn.style.display = "none";
+      return;
+    }
+
+    statsContainer.innerHTML = `Mostrando ${Math.min(visibleCount, totalMatches)} de ${totalMatches} resultados`;
+
+    const gamesToRender = currentFilteredGames.slice(0, visibleCount);
+
+    resultsContainer.innerHTML = gamesToRender
+      .map(
+        (game) => `
+      <div class="game-card">
+        <div class="game-info-container">
+          <h3>${game.title}</h3>
+          <p class="game-meta">
+            <span class="source-badge">${game.source}</span> &bull; 
+            <span>Peso:</span> ${game.fileSize}
+          </p>
+        </div>
+        ${game.link ? `<a href="${game.link}" target="_blank" class="magnet-link">Descargar</a>` : '<span class="no-magnet">Sin enlace</span>'}
+      </div>
+    `,
+      )
+      .join("");
+
+    if (visibleCount < totalMatches) {
+      loadMoreBtn.style.display = "block";
+    } else {
+      loadMoreBtn.style.display = "none";
+    }
+  }
+
+  searchInput.addEventListener("input", () => {
+    updateApp();
+  });
+
+  loadMoreBtn.addEventListener("click", () => {
+    visibleCount += 50;
+    renderCurrentView();
+  });
+
+  // Cargar al iniciar la página
+  loadStoredIndexes();
+</script>
+
+<style>
+  .Search {
+    text-align: center;
+    font-size: 1rem;
+    margin: 10px auto;
+    padding: 10px;
+    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .index-manager-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    padding: 1.5rem;
+    border-radius: 16px;
+    width: 80%;
+    margin-bottom: 25px;
+    text-align: left;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  }
+
+  .manager-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    border-bottom: 1px solid #334155;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .manager-header h3 {
+    margin: 0 0 0.2rem 0;
+    color: #f8fafc;
+    font-size: 1.25rem;
+  }
+
+  .manager-desc {
+    color: #94a3b8;
+    font-size: 0.85rem;
+    margin: 0;
+  }
+
+  .file-label {
+    background: linear-gradient(135deg, #7c3aed, #9333ea);
+    color: white;
+    padding: 0.6rem 1.2rem;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+  }
+
+  .file-label:hover {
+    background: linear-gradient(135deg, #6d28d9, #7e22ce);
+    transform: translateY(-1px);
+  }
+
+  #json-input {
+    display: none;
+  }
+
+  .indexes-grid-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  /* --- AQUÍ ESTÁ EL CAMBIO: Usamos :global() para que los elementos creados por JS cojan los estilos --- */
+  :global(.index-pill) {
+    background: #0f172a;
+    border: 1px solid #334155;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+  }
+
+  :global(.index-pill.inactive) {
+    opacity: 0.45;
+    border-style: dashed;
+  }
+
+  :global(.index-pill-info) {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  :global(.status-dot) {
+    width: 10px;
+    height: 10px;
+    background-color: #ef4444;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+  }
+
+  :global(.index-pill.active .status-dot) {
+    background-color: #22c55e;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+  }
+
+  :global(.index-text) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  :global(.index-text strong) {
+    color: #f8fafc;
+    font-size: 0.95rem;
+  }
+
+  :global(.index-text small) {
+    color: #94a3b8;
+    font-size: 0.75rem;
+  }
+
+  :global(.index-pill-actions) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  :global(.action-btn) {
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+
+  :global(.action-btn.toggle) {
+    background: #334155;
+    color: #cbd5e1;
+  }
+
+  :global(.action-btn.toggle:hover) {
+    background: #475569;
+    color: white;
+  }
+
+  :global(.action-btn.delete) {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    padding: 0.4rem 0.6rem;
+  }
+
+  :global(.action-btn.delete:hover) {
+    background: #ef4444;
+    color: white;
+  }
+
+  :global(.no-indexes) {
+    color: #64748b;
+    font-size: 0.85rem;
+    font-style: italic;
+    margin: 0;
+    text-align: center;
+    padding: 1rem;
+  }
+
+  /* BUSCADOR */
+  #search-input {
+    padding: 12px 20px;
+    margin-top: 10px;
+    border-radius: 50px;
+    background-color: #1e293b;
+    border: 2px solid #334155;
+    color: white;
+    width: 80%;
+    font-size: 1rem;
+    outline: none;
+    transition: all 0.2s;
+  }
+
+  #search-input:focus {
+    border-color: #a855f7;
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.2);
+  }
+
+  #search-input:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .stats-container {
+    margin-top: 15px;
+    color: #94a3b8;
+    font-size: 0.85rem;
+  }
+
+  /* RESULTADOS */
+  .results-grid {
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    text-align: left;
+    width: 80%;
+  }
+
+  :global(.game-card) {
+    background: #1e293b;
+    border: 1px solid #334155;
+    padding: 1.25rem;
+    border-radius: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    transition:
+      transform 0.2s ease,
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  :global(.game-card:hover) {
+    border-color: #a855f7;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(168, 85, 247, 0.15);
+  }
+
+  :global(.game-info-container) {
+    flex: 1;
+  }
+
+  :global(.game-card h3) {
+    margin: 0 0 0.4rem 0;
+    color: #f8fafc;
+    font-size: 1.15rem;
+  }
+
+  .game-meta {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin: 0;
+  }
+
+  .source-badge {
+    background: #334155;
+    color: #e2e8f0;
+    padding: 0.1rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.75rem;
+  }
+
+  :global(.magnet-link) {
+    background: linear-gradient(135deg, #7c3aed, #9333ea);
+    color: white;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(10px);
+    transition: all 0.25s ease-in-out;
+    box-shadow: 0 2px 10px rgba(124, 58, 237, 0.4);
+  }
+
+  :global(.game-card:hover .magnet-link) {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+  }
+
+  :global(.magnet-link:hover) {
+    background: linear-gradient(135deg, #6d28d9, #7e22ce);
+    box-shadow: 0 4px 15px rgba(124, 58, 237, 0.6);
+  }
+
+  :global(.no-magnet) {
+    font-size: 0.85rem;
+    color: #ef4444;
+    font-weight: 500;
+    opacity: 0.5;
+  }
+
+  .no-results {
+    text-align: center;
+    color: #94a3b8;
+    padding: 2rem;
+  }
+
+  .load-more-btn {
+    margin-top: 25px;
+    background: #1e293b;
+    border: 1px solid #7c3aed;
+    color: #a855f7;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .load-more-btn:hover {
+    background: #7c3aed;
+    color: white;
+  }
+</style>
