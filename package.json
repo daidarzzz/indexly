@@ -12,7 +12,8 @@
     "astro": "astro"
   },
   "dependencies": {
-    "astro": "^7.2.8"
+    "astro": "^7.2.8",
+    "idb-keyval": "^6.3.0"
   },
   "allowScripts": {
     "esbuild": true
