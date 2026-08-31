@@ -22,3 +22,10 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# agents instructions (not for repo)
+AGENTS.md
+CLAUDE.md
+.claude/
+.cursor/
+.opencode/

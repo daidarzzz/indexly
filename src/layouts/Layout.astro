@@ -9,8 +9,20 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <meta name="generator" content={Astro.generator} />
+    <meta name="theme-color" content="#070a12" />
+    <link rel="manifest" href={`${import.meta.env.BASE_URL}manifest.json`} />
+    <link rel="canonical" href={`https://indexly.daida.net${Astro.url.pathname}`} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="IndexLy" />
+    <meta property="og:url" content={`https://indexly.daida.net${Astro.url.pathname}`} />
+    <meta property="og:title" content={Astro.props.title ?? "IndexLy — Gestor elegante de índices locales"} />
+    <meta property="og:description" content="Carga tus archivos de juegos, libros, pelis o lo que uses, combina fuentes y busca al instante. 100% local." />
+    <meta property="og:image" content={`${import.meta.env.BASE_URL}favicon.svg`} />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={Astro.props.title ?? "IndexLy"} />
+    <meta name="twitter:description" content="Gestor elegante de índices locales. 100% local." />
     <title>{Astro.props.title ?? "IndexLy"}</title>
-    <meta name="description" content="IndexLy — Gestor elegante de índices locales. Carga tus JSON de juegos, libros, pelis o lo que uses, combina fuentes y busca al instante." />
+    <meta name="description" content="IndexLy — Gestor elegante de índices locales. Carga tus archivos de juegos, libros, pelis o lo que uses, combina fuentes y busca al instante." />
   </head>
   <body>
     <slot />

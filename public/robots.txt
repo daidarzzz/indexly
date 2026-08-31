@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://indexly.daida.net/sitemap-index.xml

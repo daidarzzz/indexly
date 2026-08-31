@@ -1,0 +1,13 @@
+{
+  "name": "IndexLy",
+  "short_name": "IndexLy",
+  "description": "Gestor elegante de índices locales. Carga tus archivos y busca al instante.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070a12",
+  "theme_color": "#070a12",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/favicon.ico", "sizes": "48x48", "type": "image/x-icon" }
+  ]
+}

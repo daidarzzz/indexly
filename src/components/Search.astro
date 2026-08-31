@@ -1,95 +1,322 @@
 ---
-// src/components/Search.astro — Premium SaaS restyle + generic normalizer + mapping modal
+// src/components/Search.astro — Premium SaaS restyle + generic normalizer + P0 polish
 ---
 
 <div class="Search">
-  <div class="index-manager-card">
+  <div class="index-manager-card" id="drop-zone">
     <div class="manager-header">
       <div class="manager-title">
-        <div class="manager-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a1a9b8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12H14l-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6l2 2h8a2 2 0 0 1 2 2v4Z"/><path d="M14 14v6H4a2 2 0 0 1-2-2v-6"/></svg>
+        <div class="manager-icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a1a9b8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12H14l-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6l2 2h8a2 2 0 0 1 2 2v4Z"/><path d="M14 14v6H4a2 2 0 0 1-2-2v-6"/></svg>
         </div>
         <div>
           <h3>Fuentes</h3>
           <p class="manager-desc">Gestiona tus índices activos</p>
         </div>
       </div>
-      <label for="json-input" class="file-label">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-        Añadir JSON
-      </label>
-      <input type="file" id="json-input" accept=".json" multiple />
+      <div class="manager-actions">
+        <button type="button" id="collapse-fuentes" class="collapse-btn" aria-expanded="true" aria-controls="indexes-list bulk-actions" aria-label="Comprimir fuentes" title="Comprimir">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <button type="button" id="export-btn" class="action-btn secondary" title="Descargar backup">Exportar</button>
+        <button type="button" id="import-btn" class="action-btn secondary" title="Restaurar backup">Importar</button>
+        <input type="file" id="import-input" accept=".json" class="sr-only" tabindex="-1" />
+        <label for="json-input" class="file-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          Añadir archivo
+        </label>
+        <input type="file" id="json-input" accept=".json,.csv,.tsv,.yaml,.yml,.xml,.txt" multiple class="sr-only" />
+      </div>
     </div>
     <div id="indexes-list" class="indexes-grid-list">
       <p class="no-indexes">No hay índices cargados todavía.</p>
     </div>
+    <div id="bulk-actions" class="bulk-actions" style="display:none">
+      <button type="button" id="bulk-enable" class="bulk-btn">Activar todo</button>
+      <button type="button" id="bulk-disable" class="bulk-btn">Desactivar todo</button>
+      <button type="button" id="bulk-clear" class="bulk-btn danger">Borrar todo</button>
+    </div>
+    <p class="drop-hint">Arrastra archivos aquí o pega con Ctrl+V</p>
   </div>
   <div class="search-wrap">
-    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-    <input type="text" id="search-input" placeholder="Buscar…" disabled autocomplete="off" spellcheck="false" />
+    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input type="text" id="search-input" placeholder="Buscar…" disabled autocomplete="off" spellcheck="false" aria-label="Buscar en índices" />
   </div>
-  <div id="stats-container" class="stats-container"></div>
-  <div id="results" class="results-grid"></div>
-  <button id="load-more-btn" class="load-more-btn" style="display: none;">Cargar más</button>
+  <div class="controls">
+    <div class="filter-chips" role="group" aria-label="Filtrar por enlace">
+      <button type="button" class="chip active" data-filter="all">Todos</button>
+      <button type="button" class="chip" data-filter="link">Con enlace</button>
+      <button type="button" class="chip" data-filter="nolink">Sin enlace</button>
+    </div>
+    <select id="sort-select" class="sort-select" aria-label="Ordenar">
+      <option value="relevance">Relevancia</option>
+      <option value="title-asc">Título A-Z</option>
+      <option value="title-desc">Título Z-A</option>
+      <option value="size-desc">Tamaño ↓</option>
+      <option value="size-asc">Tamaño ↑</option>
+      <option value="date-desc">Fecha reciente</option>
+      <option value="date-asc">Fecha antigua</option>
+    </select>
+  </div>
+  <div id="quota-info" class="quota-info" aria-live="polite"></div>
+  <div id="stats-container" class="stats-container" aria-live="polite" aria-atomic="true"></div>
+  <div id="results" class="results-grid" aria-live="polite"></div>
+  <button type="button" id="load-more-btn" class="load-more-btn" style="display: none;">Cargar más</button>
   <p class="footer-note">Todo se guarda localmente. Nada se envía a servidores.</p>
+</div>
+
+<div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+<div id="confirm-modal" class="mapping-overlay" style="display:none" aria-hidden="true">
+  <div class="mapping-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <h4 id="confirm-title">Confirmar</h4>
+    <p id="confirm-msg" class="mapping-desc"></p>
+    <div class="mapping-actions">
+      <button type="button" class="mapping-btn secondary" onclick="closeConfirmModal()">Cancelar</button>
+      <button type="button" class="mapping-btn danger" id="confirm-ok">Confirmar</button>
+    </div>
+  </div>
 </div>
 
 <div id="mapping-modal" class="mapping-overlay" style="display:none" aria-hidden="true">
   <div class="mapping-dialog" role="dialog" aria-modal="true" aria-labelledby="mapping-title">
     <div class="mapping-header">
       <h4 id="mapping-title">Ajustar fuente</h4>
-      <button class="mapping-close" onclick="closeMappingModal()" aria-label="Cerrar">✕</button>
+      <button type="button" class="mapping-close" onclick="closeMappingModal()" aria-label="Cerrar">✕</button>
     </div>
-    <p class="mapping-desc">Renombra la fuente y elige qué campo de tu JSON corresponde a cada rol.</p>
+    <p class="mapping-desc">Renombra la fuente y elige qué campo de tu archivo corresponde a cada rol.</p>
     <div class="mapping-fields">
-      <label class="mapping-label">Nombre de la fuente
+      <label class="mapping-label" for="map-name">Nombre de la fuente
         <input id="map-name" type="text" class="mapping-input" placeholder="Ej: Mis Juegos" maxlength="60" />
       </label>
-      <label class="mapping-label">Título (obligatorio)
+      <label class="mapping-label" for="map-title">Título (obligatorio)
         <select id="map-title"></select>
       </label>
-      <label class="mapping-label">Subtítulo (opcional)
+      <label class="mapping-label" for="map-subtitle">Subtítulo (opcional)
         <select id="map-subtitle"></select>
       </label>
-      <label class="mapping-label">Enlace (opcional)
+      <label class="mapping-label" for="map-link">Enlace (opcional)
         <select id="map-link"></select>
       </label>
     </div>
     <p class="mapping-hint">Vista previa: <span id="mapping-preview">—</span></p>
     <div class="mapping-actions">
-      <button class="mapping-btn secondary" onclick="closeMappingModal()">Cancelar</button>
-      <button class="mapping-btn primary" onclick="saveMapping()">Aplicar</button>
+      <button type="button" class="mapping-btn secondary" onclick="closeMappingModal()">Cancelar</button>
+      <button type="button" class="mapping-btn primary" onclick="saveMapping()">Aplicar</button>
+    </div>
+  </div>
+</div>
+
+<div id="export-modal" class="mapping-overlay" style="display:none" aria-hidden="true">
+  <div class="mapping-dialog io-dialog" role="dialog" aria-modal="true" aria-labelledby="export-title">
+    <div class="mapping-header">
+      <div class="io-heading">
+        <div class="io-icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a1a9b8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V3M8 7l4-4 4 4"/><path d="M20 16v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2"/></svg>
+        </div>
+        <h4 id="export-title">Exportar fuentes</h4>
+      </div>
+      <button type="button" class="mapping-close" onclick="closeExportModal()" aria-label="Cerrar">✕</button>
+    </div>
+    <p class="mapping-desc">Selecciona las fuentes que quieres guardar en el backup.</p>
+    <div class="io-toolbar">
+      <label class="io-select-all"><input type="checkbox" id="export-select-all" checked /> Seleccionar todo</label>
+      <span id="export-counter" class="io-counter">0/0</span>
+    </div>
+    <div id="export-list" class="io-list" role="group" aria-label="Fuentes a exportar"></div>
+    <p id="export-hint" class="mapping-hint" style="display:none"></p>
+    <div class="mapping-actions io-actions">
+      <button type="button" class="mapping-btn secondary" onclick="closeExportModal()">Cancelar</button>
+      <button type="button" class="mapping-btn primary" id="export-confirm">Exportar</button>
+    </div>
+  </div>
+</div>
+
+<div id="import-select-modal" class="mapping-overlay" style="display:none" aria-hidden="true">
+  <div class="mapping-dialog io-dialog" role="dialog" aria-modal="true" aria-labelledby="import-select-title">
+    <div class="mapping-header">
+      <div class="io-heading">
+        <div class="io-icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a1a9b8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v8M8 12l4 4 4-4"/><path d="M20 16v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2"/><path d="M4 8v-1a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1"/></svg>
+        </div>
+        <h4 id="import-select-title">Importar fuentes</h4>
+      </div>
+      <button type="button" class="mapping-close" onclick="closeImportSelectModal()" aria-label="Cerrar">✕</button>
+    </div>
+    <p class="mapping-desc">Elige qué fuentes del backup quieres añadir.</p>
+    <div class="io-toolbar">
+      <label class="io-select-all"><input type="checkbox" id="import-select-all" /> Seleccionar todo</label>
+      <span id="import-counter" class="io-counter">0/0</span>
+    </div>
+    <div id="import-select-list" class="io-list" role="group" aria-label="Fuentes a importar"></div>
+    <p id="import-hint" class="mapping-hint" style="display:none"></p>
+    <div class="mapping-actions io-actions">
+      <button type="button" class="mapping-btn secondary" onclick="closeImportSelectModal()">Cancelar</button>
+      <button type="button" class="mapping-btn primary" id="import-select-confirm">Importar</button>
     </div>
   </div>
 </div>
 
 <script>
   import { normalizeJson, getAvailableKeys, getAutoMapping } from "../utils/normalizer";
+  import { parseFileContent } from "../utils/loaders";
   import { get, set } from "idb-keyval";
   let indexes = [];
   let currentFilteredGames = [];
   let visibleCount = 50;
   let mappingModalIndexId = null;
+  let lastRemoved = null;
+  let undoTimer = null;
+  let activeFilter = "all";
+  let sortBy = "relevance";
   const fileInput = document.getElementById("json-input");
+  const importInput = document.getElementById("import-input");
+  const exportBtn = document.getElementById("export-btn");
+  const importBtn = document.getElementById("import-btn");
   const searchInput = document.getElementById("search-input");
   const resultsContainer = document.getElementById("results");
   const indexesListContainer = document.getElementById("indexes-list");
   const loadMoreBtn = document.getElementById("load-more-btn");
   const statsContainer = document.getElementById("stats-container");
+  const bulkActions = document.getElementById("bulk-actions");
+  const dropZone = document.getElementById("drop-zone");
+  const collapseBtn = document.getElementById("collapse-fuentes");
+  const fuentesCard = document.getElementById("drop-zone");
+  const toastContainer = document.getElementById("toast-container");
+  const confirmModal = document.getElementById("confirm-modal");
+  const confirmMsg = document.getElementById("confirm-msg");
+  const confirmOk = document.getElementById("confirm-ok");
   const mappingModal = document.getElementById("mapping-modal");
   const mapNameInput = document.getElementById("map-name");
   const mapTitleSelect = document.getElementById("map-title");
   const mapSubtitleSelect = document.getElementById("map-subtitle");
   const mapLinkSelect = document.getElementById("map-link");
   const mappingPreview = document.getElementById("mapping-preview");
+  const exportModal = document.getElementById("export-modal");
+  const exportList = document.getElementById("export-list");
+  const exportSelectAll = document.getElementById("export-select-all");
+  const exportHint = document.getElementById("export-hint");
+  const exportConfirm = document.getElementById("export-confirm");
+  const importSelectModal = document.getElementById("import-select-modal");
+  const importSelectList = document.getElementById("import-select-list");
+  const importSelectAll = document.getElementById("import-select-all");
+  const importHint = document.getElementById("import-hint");
+  const importSelectConfirm = document.getElementById("import-select-confirm");
+  const exportCounter = document.getElementById("export-counter");
+  const importCounter = document.getElementById("import-counter");
+  let pendingImportData = null;
 
+  function showToast(message, type="info", duration=3000, action=null) {
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${type}`;
+    toast.setAttribute("role", "status");
+    const textWrap = document.createElement("div");
+    textWrap.className = "toast-text";
+    const span = document.createElement("span");
+    span.textContent = message;
+    textWrap.appendChild(span);
+    toast.appendChild(textWrap);
+    if (action) {
+      const sep = document.createElement("span");
+      sep.className = "toast-sep";
+      sep.setAttribute("aria-hidden","true");
+      toast.appendChild(sep);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "toast-action";
+      btn.textContent = action.label;
+      btn.addEventListener("click", async (e) => {
+        e.preventDefault(); e.stopPropagation();
+        try { await action.onClick(); } catch(err){ console.error(err); }
+        toast.remove();
+      });
+      toast.appendChild(btn);
+    }
+    toastContainer.appendChild(toast);
+    let t = setTimeout(() => dismiss(), duration);
+    function dismiss(){ toast.remove(); if (action && lastRemoved) lastRemoved = null; }
+    toast.addEventListener("mouseenter", ()=> clearTimeout(t));
+    toast.addEventListener("mouseleave", ()=> { t = setTimeout(()=>dismiss(), 1200); });
+    return { dismiss };
+  }
+
+  let confirmCallback = null;
+  function showConfirm(msg, onConfirm) {
+    confirmMsg.textContent = msg;
+    confirmCallback = onConfirm;
+    confirmModal.style.display = "flex";
+    confirmModal.setAttribute("aria-hidden","false");
+    confirmOk.focus();
+  }
+  window.closeConfirmModal = function() {
+    confirmModal.style.display = "none";
+    confirmModal.setAttribute("aria-hidden","true");
+    confirmCallback = null;
+  };
+  confirmOk.addEventListener("click", () => { const cb = confirmCallback; closeConfirmModal(); if (cb) cb(); });
+  confirmModal.addEventListener("click", (e) => { if (e.target === confirmModal) closeConfirmModal(); });
+
+  function normalizeStr(s) { return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
   function getSearchableText(item) {
+    if (item._searchText != null) return item._searchText;
     const parts = [item.title, item.subtitle, item.source];
     if (item.meta) parts.push(...Object.values(item.meta));
     if (item.fileSize) parts.push(item.fileSize);
-    return parts.filter(Boolean).join(" ").toLowerCase();
+    const t = normalizeStr(parts.filter(Boolean).join(" "));
+    try { Object.defineProperty(item, "_searchText", { value: t, writable: true, enumerable: false }); } catch { item._searchText = t; }
+    return t;
+  }
+  function parseSizeToBytes(str) {
+    if (!str || typeof str!=="string") return 0;
+    const m = str.trim().match(/^([\d.,]+)\s*(B|KB|MB|GB|TB)?/i);
+    if (!m) return 0;
+    const n = parseFloat(m[1].replace(",","."));
+    const unit = (m[2]||"B").toUpperCase();
+    const mult = {B:1,KB:1024,MB:1024**2,GB:1024**3,TB:1024**4};
+    return n * (mult[unit]||1);
+  }
+  function parseDateVal(v) {
+    if (!v) return 0;
+    const d = new Date(String(v));
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  }
+  function getItemDate(item) {
+    if (item.meta) {
+      for (const [k,v] of Object.entries(item.meta)) {
+        if (["uploaddate","upload_date","fecha","fechasubida"].includes(k.toLowerCase())) return parseDateVal(v);
+      }
+    }
+    if (item.uploadDate) return parseDateVal(item.uploadDate);
+    return 0;
   }
 
+  function debounce(fn, delay) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(()=>fn(...args), delay); };
+  }
+
+  function escapeHtml(str) { const d = document.createElement("div"); d.textContent = str == null ? "" : String(str); return d.innerHTML; }
+  function formatDateDDMMYY(val) {
+    if (!val || typeof val !== "string") return val;
+    const s = val.trim();
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[3]}/${iso[2]}/${iso[1].slice(2)}`;
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth()+1).padStart(2, "0");
+      const yy = String(d.getFullYear()).slice(2);
+      return `${dd}/${mm}/${yy}`;
+    }
+    return val;
+  }
+
+  function syncQueryToURL(q) {
+    const url = new URL(window.location.href);
+    if (q) url.searchParams.set("q", q);
+    else url.searchParams.delete("q");
+    history.replaceState(null, "", url);
+  }
   async function loadStoredIndexes() {
     try {
       const saved = await get("indexly_saved_indexes");
@@ -100,6 +327,8 @@
         });
         if (indexes.length > 0) searchInput.removeAttribute("disabled");
       }
+      const urlQ = new URL(window.location.href).searchParams.get("q");
+      if (urlQ) searchInput.value = urlQ;
     } catch (e) { console.error(e); }
     updateApp();
   }
@@ -107,44 +336,250 @@
     try {
       const dataToSave = indexes.map((idx) => ({ id: idx.id, name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping || null }));
       await set("indexly_saved_indexes", dataToSave);
-    } catch (e) { console.error(e); alert("⚠️ Error al guardar en IndexedDB."); }
+    } catch (e) { console.error(e); showToast("Error al guardar en IndexedDB", "error"); }
   }
-  fileInput.addEventListener("change", async (event) => {
-    const target = event.target;
-    if (!target.files || target.files.length === 0) return;
-    const files = Array.from(target.files);
-    target.value = "";
+
+  async function handleFiles(files) {
     let addedCount = 0; let duplicateNames = [];
     for (const file of files) {
       try {
         const text = await file.text();
-        const rawData = JSON.parse(text);
+        const rawData = parseFileContent(text, file.name);
         const parsedGames = normalizeJson(rawData, file.name, null);
-        const indexName = (rawData && typeof rawData === "object" && !Array.isArray(rawData) && rawData.name) ? rawData.name : file.name.replace(/\.json$/i, "");
+        const baseName = file.name.replace(/\.[^.]+$/i, "");
+        const indexName = (rawData && typeof rawData === "object" && !Array.isArray(rawData) && rawData.name) ? rawData.name : baseName;
         const exists = indexes.some((idx) => idx.name.toLowerCase() === indexName.toLowerCase());
         if (exists) { duplicateNames.push(indexName); continue; }
         if (parsedGames.length === 0) {
-          alert(`⚠️ "${file.name}" no contiene elementos reconocibles. Puedes ajustarlo manualmente tras cargarlo.`);
-          // still add with empty so user can map
+          showToast(`"${file.name}" sin elementos reconocibles — puedes mapearlo`, "warning", 4000);
           indexes.push({ id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name: indexName, active: true, rawData, mapping: null, games: [] });
           addedCount++;
           continue;
         }
         indexes.push({ id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name: indexName, active: true, rawData, mapping: null, games: parsedGames });
         addedCount++;
-      } catch (error) { console.error(error); alert(`❌ Error en "${file.name}": ${error.message}`); }
+      } catch (error) { console.error(error); showToast(`Error en "${file.name}": ${error.message}`, "error"); }
     }
-    if (duplicateNames.length > 0) alert(`⚠️ Ya existían y se omitieron:\n• ${duplicateNames.join("\n• ")}`);
-    if (addedCount > 0) { searchInput.removeAttribute("disabled"); await saveIndexesToStorage(); updateApp(); }
+    if (duplicateNames.length > 0) showToast(`Ya existían y se omitieron: ${duplicateNames.join(", ")}`, "warning", 4000);
+    if (addedCount > 0) {
+      searchInput.removeAttribute("disabled");
+      await saveIndexesToStorage(); updateApp();
+      showToast(`${addedCount} fuente(s) añadida(s)`, "success");
+    }
+  }
+
+  fileInput.addEventListener("change", async (event) => {
+    const files = event.target.files ? Array.from(event.target.files) : [];
+    event.target.value = "";
+    if (files.length === 0) return;
+    await handleFiles(files);
   });
+
+  // Drag & Drop
+  ["dragenter","dragover"].forEach(ev => dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); }));
+  ["dragleave","drop"].forEach(ev => dropZone.addEventListener(ev, (e) => { e.preventDefault(); if (ev==="dragleave" && e.target!==dropZone) return; dropZone.classList.remove("drag-over"); }));
+  dropZone.addEventListener("drop", async (e) => {
+    const allowed = [".json",".csv",".tsv",".yaml",".yml",".xml",".txt"];
+    const files = Array.from(e.dataTransfer.files || []).filter(f => allowed.some(ext=>f.name.toLowerCase().endsWith(ext)));
+    if (files.length === 0) { showToast("Arrastra archivos .json/.csv/.yaml/.xml/.txt", "warning"); return; }
+    await handleFiles(files);
+  });
+  // Paste archivos
+  document.addEventListener("paste", async (e) => {
+    if (document.activeElement === searchInput || document.activeElement === mapNameInput) return;
+    const text = (e.clipboardData || window.clipboardData).getData("text");
+    if (!text || !text.trim()) return;
+    const t = text.trim();
+    if (!t.startsWith("{") && !t.startsWith("[") && !t.includes(",") && !t.includes(":") && !t.startsWith("<")) return;
+    try {
+      let rawData;
+      try { rawData = JSON.parse(t); } catch { rawData = parseFileContent(t, "Pegado.csv"); if (!rawData.items) throw new Error("no parse"); }
+      const parsedGames = normalizeJson(rawData, "Pegado");
+      if (parsedGames.length === 0) { showToast("El texto pegado no contiene elementos reconocibles", "warning"); return; }
+      e.preventDefault();
+      const indexName = (rawData && rawData.name) ? rawData.name : `Pegado ${new Date().toLocaleTimeString()}`;
+      if (indexes.some(x=>x.name.toLowerCase()===indexName.toLowerCase())) { showToast("Ya existe una fuente con ese nombre", "warning"); return; }
+      indexes.push({ id: Date.now().toString()+Math.random().toString(36).substring(2,7), name: indexName, active:true, rawData, mapping:null, games: parsedGames });
+      searchInput.removeAttribute("disabled");
+      await saveIndexesToStorage(); updateApp();
+      showToast(`Fuente "${indexName}" creada desde portapapeles`, "success");
+    } catch {}
+  });
+
+  // Export / Import — with selection popups
+  function getSelectedIds(container) {
+    return Array.from(container.querySelectorAll('input[type="checkbox"]:checked')).map(c=>c.value);
+  }
+  function fmtCompact(n){
+    if (n < 1000) return String(n);
+    const k = n/1000;
+    if (k >= 100) return Math.round(k) + "k";
+    const s = k.toFixed(k >= 10 ? 0 : 1).replace(".", ",").replace(",0", "");
+    return s + "k";
+  }
+  function updateExportUI() {
+    const total = indexes.length;
+    const checked = exportList.querySelectorAll('input[type="checkbox"]:checked').length;
+    exportSelectAll.checked = total>0 && checked===total;
+    exportSelectAll.indeterminate = checked>0 && checked<total;
+    exportConfirm.textContent = checked===0 ? "Exportar" : `Exportar (${checked})`;
+    exportConfirm.disabled = checked===0;
+    exportConfirm.style.opacity = checked===0 ? "0.45" : "1";
+    exportHint.style.display = checked===0 ? "block" : "none";
+    exportHint.textContent = "Selecciona al menos una fuente.";
+    if (exportCounter) exportCounter.textContent = `${checked}/${total}`;
+  }
+  function openExportModal() {
+    if (indexes.length===0) { showToast("No hay fuentes para exportar", "warning"); return; }
+    exportList.innerHTML = indexes.map(idx=>{
+      const count = idx.games.length;
+      const full = count.toLocaleString("es-ES");
+      const status = idx.mapping ? "mapeado" : "";
+      return `<label class="io-item"><input type="checkbox" value="${escapeHtml(idx.id)}" checked /><span class="io-item-dot" aria-hidden="true"></span><span class="io-item-info"><strong>${escapeHtml(idx.name)}</strong><small>${escapeHtml(status)}</small></span><span class="io-item-meta"><span class="io-item-badge" title="${escapeHtml(full)} elementos">${escapeHtml(fmtCompact(count))}</span></span></label>`;
+    }).join("");
+    exportList.querySelectorAll('input[type="checkbox"]').forEach(cb=> cb.addEventListener("change", updateExportUI));
+    updateExportUI();
+    exportModal.style.display="flex";
+    exportModal.setAttribute("aria-hidden","false");
+  }
+  window.closeExportModal = function(){ exportModal.style.display="none"; exportModal.setAttribute("aria-hidden","true"); };
+  exportSelectAll.addEventListener("change", ()=>{
+    const v = exportSelectAll.checked;
+    exportList.querySelectorAll('input[type="checkbox"]').forEach(c=>c.checked=v);
+    updateExportUI();
+  });
+  exportConfirm.addEventListener("click", ()=>{
+    const ids = new Set(getSelectedIds(exportList));
+    if (ids.size===0) return;
+    const data = indexes.filter(idx=>ids.has(idx.id)).map(idx=>({ id: idx.id, name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping }));
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `indexly-backup-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    closeExportModal();
+    showToast(`${data.length} fuente(s) exportadas`, "success");
+  });
+  exportModal.addEventListener("click", (e)=>{ if(e.target===exportModal) closeExportModal(); });
+  exportBtn.addEventListener("click", openExportModal);
+
+  function updateImportUI() {
+    const boxes = Array.from(importSelectList.querySelectorAll('input[type="checkbox"]'));
+    const enabled = boxes.filter(c=>!c.disabled);
+    const checked = enabled.filter(c=>c.checked).length;
+    importSelectAll.checked = enabled.length>0 && checked===enabled.length;
+    importSelectAll.indeterminate = checked>0 && checked<enabled.length;
+    importSelectConfirm.textContent = checked===0 ? "Importar" : `Importar (${checked})`;
+    importSelectConfirm.disabled = checked===0;
+    importSelectConfirm.style.opacity = checked===0 ? "0.45" : "1";
+    if (importCounter) importCounter.textContent = `${checked}/${enabled.length}`;
+    const dupCount = boxes.filter(c=>c.disabled).length;
+    if (dupCount>0) { importHint.style.display="block"; importHint.textContent = `${dupCount} ya existe(n) y se omitirá(n).`; }
+    else { importHint.style.display="none"; }
+  }
+  function openImportSelectModal(data) {
+    pendingImportData = data;
+    const existing = new Set(indexes.map(x=>x.name.toLowerCase()));
+    if (data.length===0) { showToast("Backup vacío", "warning"); return; }
+    importSelectList.innerHTML = data.map((item, i)=>{
+      const name = String(item.name || `Fuente ${i+1}`);
+      const isDup = existing.has(name.toLowerCase()) || !item.rawData;
+      const reason = !item.rawData ? "sin datos" : "ya existe";
+      const count = (()=>{ try{ const p=normalizeJson(item.rawData, name, item.mapping||null); return p.length; } catch{ return 0; } })();
+      const full = count.toLocaleString("es-ES");
+      const status = isDup ? reason : "";
+      return `<label class="io-item ${isDup ? "is-disabled" : ""}"><input type="checkbox" value="${i}" ${isDup ? "disabled" : "checked"} /><span class="io-item-dot" aria-hidden="true"></span><span class="io-item-info"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(status)}</small></span><span class="io-item-meta"><span class="io-item-badge" title="${escapeHtml(full)} elementos">${escapeHtml(fmtCompact(count))}</span></span></label>`;
+    }).join("");
+    importSelectList.querySelectorAll('input[type="checkbox"]:not([disabled])').forEach(cb=> cb.addEventListener("change", updateImportUI));
+    updateImportUI();
+    importSelectModal.style.display="flex";
+    importSelectModal.setAttribute("aria-hidden","false");
+  }
+  window.closeImportSelectModal = function(){ importSelectModal.style.display="none"; importSelectModal.setAttribute("aria-hidden","true"); pendingImportData=null; };
+  importSelectAll.addEventListener("change", ()=>{
+    const v = importSelectAll.checked;
+    importSelectList.querySelectorAll('input[type="checkbox"]:not([disabled])').forEach(c=>c.checked=v);
+    updateImportUI();
+  });
+  importSelectConfirm.addEventListener("click", async ()=>{
+    if (!pendingImportData) return;
+    const idxs = getSelectedIds(importSelectList).map(Number);
+    if (idxs.length===0) return;
+    let imported=0; let skipped=[];
+    for (const i of idxs) {
+      const item = pendingImportData[i];
+      if (!item || !item.rawData) { skipped.push(String(item?.name||i)); continue; }
+      if (indexes.some(x=>x.name.toLowerCase()===String(item.name).toLowerCase())) { skipped.push(item.name); continue; }
+      const parsed = normalizeJson(item.rawData, item.name, item.mapping || null);
+      indexes.push({ id: Date.now().toString()+Math.random().toString(36).substring(2,7), name: item.name, active: item.active ?? true, rawData: item.rawData, mapping: item.mapping||null, games: parsed });
+      imported++;
+    }
+    const hadSkipped = skipped.length>0;
+    closeImportSelectModal();
+    if (imported) { searchInput.removeAttribute("disabled"); await saveIndexesToStorage(); updateApp(); showToast(`${imported} fuente(s) importadas`, "success"); }
+    if (hadSkipped) showToast(`Omitidas: ${skipped.join(", ")}`, "warning", 4000);
+    if (!imported && !hadSkipped) showToast("Nada que importar", "warning");
+  });
+  importSelectModal.addEventListener("click", (e)=>{ if(e.target===importSelectModal) closeImportSelectModal(); });
+  importBtn.addEventListener("click", () => importInput.click());
+  importInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!Array.isArray(data)) throw new Error("Backup debe ser un array");
+      openImportSelectModal(data);
+    } catch(err){ showToast(`Error en backup: ${err.message}`, "error"); }
+  });
+
+  // Bulk actions
+  document.getElementById("bulk-enable").addEventListener("click", async () => {
+    indexes.forEach(i=>i.active=true); await saveIndexesToStorage(); updateApp(); showToast("Todas activadas", "success");
+  });
+  document.getElementById("bulk-disable").addEventListener("click", async () => {
+    indexes.forEach(i=>i.active=false); await saveIndexesToStorage(); updateApp(); showToast("Todas desactivadas", "success");
+  });
+  document.getElementById("bulk-clear").addEventListener("click", () => {
+    if (indexes.length===0) return;
+    showConfirm(`¿Borrar todas las fuentes (${indexes.length})? No se puede deshacer en bloque.`, async () => {
+      indexes = []; searchInput.value=""; searchInput.setAttribute("disabled","true");
+      await saveIndexesToStorage(); updateApp(); showToast("Todas las fuentes borradas", "info");
+    });
+  });
+
   window.toggleIndex = async function (id) {
     const idx = indexes.find((i) => i.id === id);
     if (idx) { idx.active = !idx.active; await saveIndexesToStorage(); updateApp(); }
   };
   window.removeIndex = async function (id) {
-    indexes = indexes.filter((i) => i.id !== id);
-    if (indexes.length === 0) { searchInput.setAttribute("disabled", "true"); searchInput.value = ""; }
-    await saveIndexesToStorage(); updateApp();
+    const idx = indexes.find(i=>i.id===id);
+    if (!idx) return;
+    showConfirm(`¿Eliminar “${idx.name}”?`, async () => {
+      if (undoTimer) clearTimeout(undoTimer);
+      const removedIdx = indexes.findIndex(x=>x.id===id);
+      lastRemoved = { data: idx, index: removedIdx };
+      indexes = indexes.filter((i) => i.id !== id);
+      if (indexes.length === 0) { searchInput.setAttribute("disabled", "true"); searchInput.value = ""; }
+      await saveIndexesToStorage(); updateApp();
+      showToast(`${idx.name} eliminada`, "info", 6000, {
+        label: "Deshacer",
+        onClick: async () => {
+          if (lastRemoved && lastRemoved.data.id === id) {
+            const pos = Math.min(lastRemoved.index, indexes.length);
+            indexes.splice(pos, 0, lastRemoved.data);
+            lastRemoved = null;
+            if (undoTimer) { clearTimeout(undoTimer); undoTimer=null; }
+            if (indexes.length>=1) searchInput.removeAttribute("disabled");
+            await saveIndexesToStorage(); updateApp();
+            showToast("Restaurada", "success");
+          }
+        }
+      });
+      undoTimer = setTimeout(()=>{ lastRemoved=null; }, 6500);
+    });
   };
 
   function fillSelect(select, keys, current, includeEmpty) {
@@ -184,7 +619,7 @@
     mappingModalIndexId = id;
     const keys = getAvailableKeys(idx.rawData);
     if (keys.length === 0) {
-      alert("Este JSON no tiene campos mapeables (array de primitivos o estructura no soportada).");
+      showToast("Sin campos mapeables (array de primitivos)", "warning");
       return;
     }
     mapNameInput.value = idx.name || "";
@@ -207,11 +642,11 @@
     const idx = indexes.find(i => i.id === mappingModalIndexId);
     if (!idx) return;
     const newName = mapNameInput.value.trim();
-    if (!newName) { alert("El nombre no puede estar vacío."); return; }
+    if (!newName) { showToast("El nombre no puede estar vacío", "warning"); return; }
     const duplicate = indexes.some(x => x.id !== idx.id && x.name.toLowerCase() === newName.toLowerCase());
-    if (duplicate) { alert(`Ya existe otra fuente llamada "${newName}".`); return; }
+    if (duplicate) { showToast(`Ya existe "${newName}"`, "warning"); return; }
     const titleKey = mapTitleSelect.value;
-    if (!titleKey) { alert("Debes elegir un campo de Título."); return; }
+    if (!titleKey) { showToast("Elige Título", "warning"); return; }
     const mapping = { titleKey, subtitleKey: mapSubtitleSelect.value || null, linkKey: mapLinkSelect.value || null };
     idx.name = newName;
     idx.mapping = mapping;
@@ -219,62 +654,68 @@
     await saveIndexesToStorage();
     closeMappingModal();
     updateApp();
+    showToast("Mapeo actualizado", "success");
   };
   mapTitleSelect.addEventListener("change", updateMappingPreview);
   mapSubtitleSelect.addEventListener("change", updateMappingPreview);
   mapLinkSelect.addEventListener("change", updateMappingPreview);
   mappingModal.addEventListener("click", (e) => { if (e.target === mappingModal) closeMappingModal(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && mappingModal.style.display !== "none") closeMappingModal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && confirmModal.style.display !== "none") closeConfirmModal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && exportModal.style.display !== "none") closeExportModal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && importSelectModal.style.display !== "none") closeImportSelectModal(); });
 
-  function updateApp() {
-    renderIndexesManager();
+  function renderSearch() {
     let activeGames = [];
     indexes.forEach((index) => { if (index.active) activeGames = activeGames.concat(index.games); });
-    const query = searchInput.value.toLowerCase().trim();
-    if (query === "") {
-      currentFilteredGames = activeGames;
-    } else {
-      currentFilteredGames = activeGames.filter((g) => getSearchableText(g).includes(query));
+    const rawQ = searchInput.value.trim();
+    syncQueryToURL(rawQ);
+    const query = normalizeStr(rawQ);
+    if (activeFilter==="link") activeGames = activeGames.filter(g=> g.link && g.link.trim());
+    else if (activeFilter==="nolink") activeGames = activeGames.filter(g=> !g.link || !g.link.trim());
+    let filtered = query === "" ? activeGames : activeGames.filter((g) => getSearchableText(g).includes(query));
+    if (sortBy!=="relevance") {
+      filtered = [...filtered].sort((a,b)=>{
+        if (sortBy==="title-asc") return a.title.localeCompare(b.title);
+        if (sortBy==="title-desc") return b.title.localeCompare(a.title);
+        if (sortBy==="size-desc") return parseSizeToBytes(b.fileSize||b.meta?.Tamaño||"") - parseSizeToBytes(a.fileSize||a.meta?.Tamaño||"");
+        if (sortBy==="size-asc") return parseSizeToBytes(a.fileSize||a.meta?.Tamaño||"") - parseSizeToBytes(b.fileSize||b.meta?.Tamaño||"");
+        if (sortBy==="date-desc") return getItemDate(b) - getItemDate(a);
+        if (sortBy==="date-asc") return getItemDate(a) - getItemDate(b);
+        return 0;
+      });
     }
+    currentFilteredGames = filtered;
     visibleCount = 50;
     renderCurrentView();
   }
+  function updateApp() {
+    renderIndexesManager();
+    renderSearch();
+    updateQuotaInfo();
+  }
   function renderIndexesManager() {
     if (indexes.length === 0) {
-      indexesListContainer.innerHTML = `<div class="empty-state"><div class="empty-icon">◇</div><p class="no-indexes">Sin fuentes aún<br><span>Sube uno o varios .json para empezar</span></p></div>`;
+      indexesListContainer.innerHTML = `<div class="empty-state"><div class="empty-icon">◇</div><p class="no-indexes">Sin fuentes aún<br><span>Sube uno o varios archivos para empezar</span></p></div>`;
+      bulkActions.style.display = "none";
       return;
     }
+    bulkActions.style.display = "flex";
     indexesListContainer.innerHTML = indexes.map((index) => `
       <div class="index-pill ${index.active ? "active" : "inactive"}">
         <div class="index-pill-info">
-          <span class="status-dot"></span>
+          <span class="status-dot" aria-hidden="true"></span>
           <div class="index-text">
             <strong>${escapeHtml(index.name)}</strong>
             <small>${index.games.length.toLocaleString("es-ES")} elementos${index.mapping ? " · mapeado" : ""}</small>
           </div>
         </div>
         <div class="index-pill-actions">
-          <button class="action-btn map" onclick="openMappingModal('${index.id}')" title="Ajustar mapeo">⚙</button>
-          <button class="action-btn toggle" onclick="toggleIndex('${index.id}')">${index.active ? "Desactivar" : "Activar"}</button>
-          <button class="action-btn delete" onclick="removeIndex('${index.id}')" aria-label="Eliminar">✕</button>
+          <button type="button" class="action-btn map" onclick="openMappingModal('${index.id}')" title="Ajustar mapeo" aria-label="Ajustar ${escapeHtml(index.name)}">⚙</button>
+          <button type="button" class="action-btn toggle" onclick="toggleIndex('${index.id}')">${index.active ? "Desactivar" : "Activar"}</button>
+          <button type="button" class="action-btn delete" onclick="removeIndex('${index.id}')" aria-label="Eliminar ${escapeHtml(index.name)}">✕</button>
         </div>
       </div>`).join("");
-  }
-  function escapeHtml(str) { const d = document.createElement("div"); d.textContent = str == null ? "" : String(str); return d.innerHTML; }
-  function formatDateDDMMYY(val) {
-    if (!val || typeof val !== "string") return val;
-    const s = val.trim();
-    // ISO 8601 like 2026-04-04 or 2026-04-04T17:39:30+00:00
-    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (iso) return `${iso[3]}/${iso[2]}/${iso[1].slice(2)}`;
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) {
-      const dd = String(d.getDate()).padStart(2, "0");
-      const mm = String(d.getMonth()+1).padStart(2, "0");
-      const yy = String(d.getFullYear()).slice(2);
-      return `${dd}/${mm}/${yy}`;
-    }
-    return val;
   }
 
   function renderMetaBadges(meta) {
@@ -296,7 +737,7 @@
   function renderCurrentView() {
     if (indexes.length === 0) {
       resultsContainer.innerHTML = ""; statsContainer.innerHTML = ""; loadMoreBtn.style.display = "none";
-      searchInput.placeholder = "Sube un JSON arriba para empezar…"; return;
+      searchInput.placeholder = "Sube un archivo arriba para empezar…"; return;
     }
     const totalMatches = currentFilteredGames.length;
     searchInput.placeholder = `Buscar entre ${totalMatches.toLocaleString("es-ES")} elementos…`;
@@ -318,16 +759,55 @@
           ${subtitleHtml}
           <p class="game-meta"><span class="source-badge">${escapeHtml(game.source)}</span>${hasMeta ? metaHtml : ""}</p>
         </div>
-        ${game.link ? `<a href="${escapeHtml(game.link)}" target="_blank" rel="noopener" class="magnet-link">Abrir <span>↗</span></a>` : '<span class="no-magnet">Sin enlace</span>'}
+        ${game.link ? `<a href="${escapeHtml(game.link)}" target="_blank" rel="noopener" class="magnet-link">Abrir <span aria-hidden="true">↗</span></a>` : '<span class="no-magnet">Sin enlace</span>'}
       </div>`;
     }).join("");
     loadMoreBtn.style.display = visibleCount < totalMatches ? "inline-flex" : "none";
   }
-  searchInput.addEventListener("input", () => updateApp());
+  searchInput.addEventListener("input", () => renderSearch());
   loadMoreBtn.addEventListener("click", () => { visibleCount += 50; renderCurrentView(); });
+  // Sort & filter
+  const sortSelect = document.getElementById("sort-select");
+  const quotaInfo = document.getElementById("quota-info");
+  sortSelect.addEventListener("change", (e) => { sortBy = e.target.value; renderSearch(); });
+  document.querySelectorAll(".chip").forEach(btn=> btn.addEventListener("click", () => {
+    document.querySelectorAll(".chip").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    activeFilter = btn.dataset.filter;
+    renderSearch();
+  }));
+  async function updateQuotaInfo() {
+    try {
+      if (navigator.storage && navigator.storage.estimate) {
+        const est = await navigator.storage.estimate();
+        if (est.quota && est.usage) {
+          const pct = Math.round((est.usage/est.quota)*100);
+          const usedMB = (est.usage/1024/1024).toFixed(1);
+          if (pct>75) quotaInfo.textContent = `Almacenamiento: ${usedMB} MB (${pct}%)`;
+          else quotaInfo.textContent = "";
+        }
+      }
+    } catch {}
+  }
+  // Collapse fuentes
+  let fuentesCollapsed = localStorage.getItem("indexly_fuentes_collapsed") === "1";
+  function applyFuentesCollapsed(v) {
+    fuentesCollapsed = v;
+    fuentesCard.classList.toggle("collapsed", v);
+    if (collapseBtn) {
+      collapseBtn.setAttribute("aria-expanded", String(!v));
+      collapseBtn.setAttribute("aria-label", v ? "Expandir fuentes" : "Comprimir fuentes");
+      collapseBtn.title = v ? "Expandir" : "Comprimir";
+    }
+    localStorage.setItem("indexly_fuentes_collapsed", v ? "1" : "0");
+  }
+  if (collapseBtn) {
+    applyFuentesCollapsed(fuentesCollapsed);
+    collapseBtn.addEventListener("click", () => applyFuentesCollapsed(!fuentesCard.classList.contains("collapsed")));
+  }
   document.addEventListener("keydown", (e) => {
     const mod = e.metaKey || e.ctrlKey;
-    if ((e.key === "/" && document.activeElement !== searchInput && !mod) || (mod && e.key.toLowerCase() === "k")) {
+    if ((e.key === "/" && document.activeElement !== searchInput && document.activeElement !== mapNameInput && !mod) || (mod && e.key.toLowerCase() === "k")) {
       e.preventDefault(); searchInput.focus();
     }
   });
@@ -348,7 +828,9 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-xl);
     padding: var(--space-8);
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
+  .index-manager-card.drag-over { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); }
   .manager-header {
     display: flex;
     justify-content: space-between;
@@ -381,6 +863,17 @@
     font-weight: var(--weight-light);
     color: var(--color-text-secondary);
   }
+  .manager-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .manager-actions .action-btn.secondary { color: var(--color-text-secondary); }
+  .collapse-btn { width: 26px; height: 26px; display: grid; place-items: center; background: transparent; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-text-tertiary); cursor: pointer; flex-shrink: 0; }
+  .collapse-btn:hover { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-border-strong); }
+  .collapse-btn svg { transition: transform 0.15s ease; }
+  .index-manager-card.collapsed .collapse-btn svg { transform: rotate(180deg); }
+  .index-manager-card.collapsed #indexes-list,
+  .index-manager-card.collapsed #bulk-actions,
+  .index-manager-card.collapsed .drop-hint { display: none; }
+  .index-manager-card.collapsed .manager-header { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .manager-actions .action-btn.secondary:hover { background: var(--color-surface-raised); color: var(--color-text); }
   .file-label {
     display: inline-flex;
     align-items: center;
@@ -397,7 +890,21 @@
     transition: opacity 0.15s ease;
   }
   .file-label:hover { opacity: 0.86; }
-  #json-input { display: none; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  .bulk-actions { display: flex; gap: var(--space-2); margin-top: var(--space-4); flex-wrap: wrap; }
+  .bulk-btn { background: transparent; border: 1px solid var(--color-border); color: var(--color-text-secondary); padding: 6px 12px; border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: 500; cursor: pointer; }
+  .bulk-btn:hover { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-border-strong); }
+  .bulk-btn.danger:hover { background: rgba(239,68,68,0.08); color: #f87171; border-color: rgba(239,68,68,0.15); }
+  .drop-hint { margin: var(--space-3) 0 0; text-align: center; font-size: var(--text-xs); color: var(--color-text-tertiary); }
+  .controls { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 18px; padding: 4px; background: #0a0f1c; border: 1px solid #1a2332; border-radius: 999px; flex-wrap: wrap; }
+  .filter-chips { display: flex; gap: 2px; padding: 2px; background: #070a12; border: 1px solid #1e293b; border-radius: 999px; }
+  .chip { background: transparent; border: none; color: #64748b; padding: 6px 13px; border-radius: 999px; font-size: 11px; font-weight: 500; letter-spacing: 0.01em; cursor: pointer; transition: background 0.15s, color 0.15s; }
+  .chip.active { background: #fff; color: #0f172a; box-shadow: 0 1px 6px rgba(0,0,0,0.15); }
+  .chip:not(.active):hover { color: #cbd5e1; }
+  .sort-select { background: #070a12; border: 1px solid #1e293b; color: #94a3b8; padding: 7px 28px 7px 12px; border-radius: 999px; font-size: 11px; font-weight: 500; letter-spacing: 0.01em; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2364748b' stroke-width='1.3' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+  .sort-select:focus { outline: none; border-color: #24344f; box-shadow: 0 0 0 3px rgba(14,165,233,0.08); }
+  .sort-select:hover { border-color: #24344f; color: #cbd5e1; }
+  .quota-info { font-size: var(--text-xs); color: var(--color-text-tertiary); min-height: 14px; margin-top: var(--space-2); text-align: right; }
   .indexes-grid-list { display: flex; flex-direction: column; gap: var(--space-2); min-height: 36px; }
   .empty-state {
     display: flex; flex-direction: column; align-items: center;
@@ -475,6 +982,7 @@
     background: var(--color-surface); border: 1px solid var(--color-border); padding: var(--space-4); border-radius: var(--radius-lg);
     display: flex; justify-content: space-between; align-items: center; gap: var(--space-4);
     transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    content-visibility: auto; contain-intrinsic-size: 0 80px;
   }
   :global(.game-card:hover) { border-color: var(--color-border-hover); box-shadow: var(--shadow-subtle); transform: translateY(-1px); }
   :global(.game-info-container) { flex: 1; min-width: 0; }
@@ -518,31 +1026,88 @@
     :global(.game-card) { flex-direction: column; align-items: stretch; }
     :global(.magnet-link), :global(.no-magnet) { width: 100%; justify-content: center; }
   }
-  /* Mapping modal */
+  /* Toasts — minimal, static (no animation) */
+  :global(.toast-container) { position: fixed; bottom: 18px; right: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 100; pointer-events: none; }
+  :global(.toast) { display: inline-flex; align-items: center; gap: 0; background: #0f141e; border: 1px solid #1e293b; color: #94a3b8; padding: 0; border-radius: 10px; font-size: 12px; font-weight: 400; letter-spacing: 0.01em; box-shadow: 0 10px 28px rgba(0,0,0,0.42), 0 0 0 1px rgba(255,255,255,0.03) inset; pointer-events: auto; max-width: 380px; line-height: 1.4; overflow: hidden; }
+  :global(.toast-text) { padding: 10px 14px; display: flex; align-items: center; min-width: 0; flex: 1; }
+  :global(.toast-text span) { color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22ch; }
+  :global(.toast-success .toast-text span::before) { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #22c55e; margin-right: 8px; vertical-align: middle; flex-shrink: 0; }
+  :global(.toast-warning .toast-text span::before) { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #eab308; margin-right: 8px; vertical-align: middle; flex-shrink: 0; }
+  :global(.toast-error) { border-color: rgba(239,68,68,0.22); background: #12151f; }
+  :global(.toast-error .toast-text span::before) { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #ef4444; margin-right: 8px; vertical-align: middle; flex-shrink: 0; }
+  :global(.toast-sep) { width: 1px; align-self: stretch; background: #1e293b; flex-shrink: 0; margin: 6px 0; }
+  :global(.toast-action) { -webkit-appearance: none; appearance: none; font-family: inherit; background: #1a2335; color: #e2e8f0; border: 1px solid #24344f; padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; cursor: pointer; flex-shrink: 0; }
+  :global(.toast-action:hover) { background: #1e2e4a; color: #fff; border-color: #2a3f62; }
+  :global(.toast-action:active) { background: #16233a; }
+  :global(.toast-action:focus-visible) { outline: 1px solid var(--color-primary); outline-offset: 2px; }
+  @media (max-width: 640px) { :global(.toast-container) { left: 12px; right: 12px; bottom: 14px; align-items: stretch; } :global(.toast) { max-width: none; } }
+  /* Modals — minimal, no animation */
   .mapping-overlay {
-    position: fixed; inset: 0; background: rgba(7,10,18,0.65); backdrop-filter: blur(4px);
+    position: fixed; inset: 0; background: rgba(3,6,12,0.62); backdrop-filter: blur(6px) saturate(110%);
     display: flex; align-items: center; justify-content: center; z-index: 50; padding: var(--space-4);
   }
   .mapping-dialog {
-    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-xl);
-    padding: var(--space-6); max-width: 420px; width: 100%; box-shadow: var(--shadow-subtle);
-    display: flex; flex-direction: column; gap: var(--space-4);
+    background: #0f141e; border: 1px solid #1e293b; border-radius: 14px;
+    padding: 22px; max-width: 400px; width: 100%;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.03) inset;
+    display: flex; flex-direction: column; gap: 16px;
   }
   .mapping-header { display: flex; justify-content: space-between; align-items: center; }
-  .mapping-header h4 { margin: 0; font-size: var(--text-md); font-weight: var(--weight-medium); color: var(--color-text); }
-  .mapping-close { background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-full); width: 28px; height: 28px; display: grid; place-items: center; cursor: pointer; color: var(--color-text-secondary); }
-  .mapping-close:hover { background: var(--color-surface-raised); color: var(--color-text); }
-  .mapping-desc { margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary); line-height: 1.4; }
-  .mapping-fields { display: flex; flex-direction: column; gap: var(--space-3); }
-  .mapping-label { display: flex; flex-direction: column; gap: 6px; font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--color-text); }
-  .mapping-label select, .mapping-input { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 8px 10px; color: var(--color-text); font-size: var(--text-sm); }
-  .mapping-label select:focus, .mapping-input:focus { outline: none; border-color: var(--color-border-hover); box-shadow: var(--shadow-focus); }
-  .mapping-hint { margin: 0; font-size: var(--text-xs); color: var(--color-text-secondary); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3); }
-  .mapping-hint span { color: var(--color-text); font-weight: var(--weight-medium); }
-  .mapping-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
-  .mapping-btn { padding: 8px 14px; border-radius: var(--radius-full); font-size: var(--text-sm); font-weight: 500; cursor: pointer; border: 1px solid transparent; }
-  .mapping-btn.secondary { background: transparent; border-color: var(--color-border); color: var(--color-text-secondary); }
-  .mapping-btn.secondary:hover { background: var(--color-surface-raised); color: var(--color-text); }
-  .mapping-btn.primary { background: var(--color-text); color: var(--color-bg); }
-  .mapping-btn.primary:hover { opacity: 0.9; }
+  .mapping-header h4 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: -0.01em; color: #f1f5f9; }
+  .mapping-close { background: transparent; border: 1px solid #1e293b; border-radius: 999px; width: 26px; height: 26px; display: grid; place-items: center; cursor: pointer; color: #64748b; font-size: 11px; line-height: 1; }
+  .mapping-close:hover { background: #152033; color: #e2e8f0; border-color: #24344f; }
+  .mapping-desc { margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.5; }
+  .mapping-fields { display: flex; flex-direction: column; gap: 12px; }
+  .mapping-label { display: flex; flex-direction: column; gap: 6px; font-size: 11px; font-weight: 500; letter-spacing: 0.02em; text-transform: uppercase; color: #94a3b8; }
+  .mapping-label select, .mapping-input { background: #070a12; border: 1px solid #1e293b; border-radius: 8px; padding: 9px 10px; color: #e2e8f0; font-size: 13px; font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .mapping-label select:focus, .mapping-input:focus { outline: none; border-color: #24344f; box-shadow: 0 0 0 3px rgba(14,165,233,0.08); }
+  .mapping-hint { margin: 0; font-size: 11px; color: #64748b; background: #070a12; border: 1px solid #1e293b; border-radius: 8px; padding: 10px 12px; line-height: 1.5; }
+  .mapping-hint span { color: #cbd5e1; font-weight: 500; }
+  .mapping-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+  .mapping-btn { padding: 8px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; letter-spacing: 0.01em; cursor: pointer; border: 1px solid transparent; transition: background 0.15s, border-color 0.15s, opacity 0.15s; }
+  .mapping-btn.secondary { background: transparent; border-color: #1e293b; color: #94a3b8; }
+  .mapping-btn.secondary:hover { background: #152033; color: #e2e8f0; border-color: #24344f; }
+  .mapping-btn.primary { background: #fff; color: #0f172a; border-color: #fff; }
+  .mapping-btn.primary:hover { background: #f1f5f9; }
+  .mapping-btn.danger { background: transparent; color: #f87171; border-color: #1e293b; }
+  .mapping-btn.danger:hover { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.18); color: #fca5a5; }
+  /* IO select modals — premium (global: items are injected via innerHTML) */
+  :global(.io-dialog) { max-width: 440px; padding: 0; overflow: hidden; gap: 0; }
+  :global(.io-dialog) :global(.mapping-header) { padding: 20px 20px 14px; border-bottom: 1px solid #1e293b; }
+  :global(.io-heading) { display: flex; align-items: center; gap: 10px; }
+  :global(.io-icon) { width: 30px; height: 30px; display: grid; place-items: center; background: #070a12; border: 1px solid #1e293b; border-radius: 9px; flex-shrink: 0; }
+  :global(.io-dialog) :global(.mapping-desc) { padding: 14px 20px 0; }
+  :global(.io-toolbar) { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 20px 0; padding: 6px 6px 6px 8px; background: #070a12; border: 1px solid #1e293b; border-radius: 999px; }
+  :global(.io-select-all) { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: #94a3b8; cursor: pointer; user-select: none; background: #0f141e; border: 1px solid #1e293b; padding: 6px 12px; border-radius: 999px; transition: background 0.15s, border-color 0.15s, color 0.15s; }
+  :global(.io-select-all:hover) { background: #152033; border-color: #24344f; color: #e2e8f0; }
+  :global(.io-select-all:has(input:checked)) { background: #fff; border-color: #fff; color: #0f172a; }
+  :global(.io-select-all:has(input:checked):hover) { background: #f1f5f9; border-color: #f1f5f9; }
+  :global(.io-select-all input) { accent-color: #0ea5e9; width: 14px; height: 14px; }
+  :global(.io-select-all:has(input:checked) input) { accent-color: #0f172a; }
+  :global(.io-counter) { font-size: 11px; font-weight: 600; color: #e2e8f0; background: #0f141e; border: 1px solid #1e293b; padding: 3px 9px; border-radius: 999px; letter-spacing: 0.01em; min-width: 38px; text-align: center; }
+  :global(.io-list) { display: flex; flex-direction: column; gap: 8px; max-height: 264px; overflow: auto; padding: 14px 20px 16px; scrollbar-width: thin; scrollbar-color: #24344f transparent; }
+  :global(.io-list)::-webkit-scrollbar { width: 6px; }
+  :global(.io-list)::-webkit-scrollbar-thumb { background: #24344f; border-radius: 999px; }
+  :global(.io-list)::-webkit-scrollbar-track { background: transparent; }
+  :global(.io-item) { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #1e293b; border-radius: 12px; background: #070a12; cursor: pointer; user-select: none; transition: border-color 0.15s, background 0.15s, box-shadow 0.15s; }
+  :global(.io-item:hover) { background: #0d1528; border-color: #24344f; }
+  :global(.io-item:has(input:checked)) { background: #0a1220; border-color: #24344f; box-shadow: 0 0 0 1px rgba(14,165,233,0.08) inset; }
+  :global(.io-item.is-disabled) { opacity: 0.5; cursor: not-allowed; border-style: dashed; }
+  :global(.io-item.is-disabled:hover) { background: #070a12; border-color: #1e293b; box-shadow: none; }
+  :global(.io-item input) { accent-color: #0ea5e9; width: 15px; height: 15px; flex-shrink: 0; }
+  :global(.io-item-info) { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 1px; }
+  :global(.io-item-info strong) { font-size: 12.5px; font-weight: 600; letter-spacing: -0.01em; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+  :global(.io-item-info small) { font-size: 11px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  :global(.io-item-meta) { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  :global(.io-item-badge) { font-size: 10px; font-weight: 600; color: #94a3b8; border: 1px solid #1e293b; background: #0f141e; padding: 4px 8px; border-radius: 999px; letter-spacing: 0.02em; }
+  :global(.io-item.is-disabled .io-item-badge) { color: #64748b; }
+  :global(.io-item-dot) { width: 7px; height: 7px; border-radius: 50%; background: #1e293b; flex-shrink: 0; }
+  :global(.io-item:has(input:checked) .io-item-dot) { background: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.18); }
+  :global(.io-item.is-disabled .io-item-dot) { background: #334155; box-shadow: none; }
+  :global(.io-dialog .mapping-hint) { margin: 0 20px 14px; }
+  :global(.io-actions) { padding: 14px 20px 20px; border-top: 1px solid #1e293b; margin-top: 0; }
+  /* Confirm variant — a bit tighter */
+  #confirm-modal .mapping-dialog { max-width: 380px; padding: 20px; gap: 14px; }
+  #confirm-modal #confirm-title { font-size: 13px; }
+  #confirm-modal #confirm-msg { font-size: 12px; }
 </style>
