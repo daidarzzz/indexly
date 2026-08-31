@@ -10,12 +10,18 @@ import Search from "../components/Search.astro";
     <Search />
   </main>
   <footer class="site-footer">
-    <span>IndexLy</span> · Hecho para organizar tu biblioteca. <a href="https://github.com/daidarzzz/indexly" target="_blank" rel="noopener">Open source</a>
+    <span>IndexLy</span> · Hecho para organizar tu biblioteca. <a
+      href="https://github.com/daidarzzz/indexly"
+      target="_blank"
+      rel="noopener">Open source</a
+    >
   </footer>
 </Layout>
 
 <style>
-  main { display: block; }
+  main {
+    display: block;
+  }
   .site-footer {
     max-width: 700px;
     margin: 0 auto;
@@ -27,7 +33,20 @@ import Search from "../components/Search.astro";
     letter-spacing: 0.02em;
     border-top: 1px solid var(--color-border);
   }
-  .site-footer span { color: var(--color-text); font-weight: var(--weight-medium); }
-  .site-footer a { color: var(--color-text-secondary); text-decoration: none; border-bottom: 1px solid transparent; transition: color 0.15s ease, border-color 0.15s ease; }
-  .site-footer a:hover { color: var(--color-text); border-color: var(--color-border-strong); }
+  .site-footer span {
+    color: var(--color-text);
+    font-weight: var(--weight-medium);
+  }
+  .site-footer a {
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+  .site-footer a:hover {
+    color: var(--color-text);
+    border-color: var(--color-border-strong);
+  }
 </style>

@@ -1,5 +1,5 @@
 ---
-// src/components/Search.astro — Premium SaaS restyle (lógica intacta)
+// src/components/Search.astro — Premium SaaS restyle + generic normalizer + mapping modal
 ---
 
 <div class="Search">
@@ -26,7 +26,7 @@
   </div>
   <div class="search-wrap">
     <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-    <input type="text" id="search-input" placeholder="Buscar juegos…" disabled autocomplete="off" spellcheck="false" />
+    <input type="text" id="search-input" placeholder="Buscar…" disabled autocomplete="off" spellcheck="false" />
   </div>
   <div id="stats-container" class="stats-container"></div>
   <div id="results" class="results-grid"></div>
@@ -34,25 +34,69 @@
   <p class="footer-note">Todo se guarda localmente. Nada se envía a servidores.</p>
 </div>
 
+<div id="mapping-modal" class="mapping-overlay" style="display:none" aria-hidden="true">
+  <div class="mapping-dialog" role="dialog" aria-modal="true" aria-labelledby="mapping-title">
+    <div class="mapping-header">
+      <h4 id="mapping-title">Ajustar fuente</h4>
+      <button class="mapping-close" onclick="closeMappingModal()" aria-label="Cerrar">✕</button>
+    </div>
+    <p class="mapping-desc">Renombra la fuente y elige qué campo de tu JSON corresponde a cada rol.</p>
+    <div class="mapping-fields">
+      <label class="mapping-label">Nombre de la fuente
+        <input id="map-name" type="text" class="mapping-input" placeholder="Ej: Mis Juegos" maxlength="60" />
+      </label>
+      <label class="mapping-label">Título (obligatorio)
+        <select id="map-title"></select>
+      </label>
+      <label class="mapping-label">Subtítulo (opcional)
+        <select id="map-subtitle"></select>
+      </label>
+      <label class="mapping-label">Enlace (opcional)
+        <select id="map-link"></select>
+      </label>
+    </div>
+    <p class="mapping-hint">Vista previa: <span id="mapping-preview">—</span></p>
+    <div class="mapping-actions">
+      <button class="mapping-btn secondary" onclick="closeMappingModal()">Cancelar</button>
+      <button class="mapping-btn primary" onclick="saveMapping()">Aplicar</button>
+    </div>
+  </div>
+</div>
+
 <script>
-  import { parseGameJson } from "../utils/gameParser";
+  import { normalizeJson, getAvailableKeys, getAutoMapping } from "../utils/normalizer";
   import { get, set } from "idb-keyval";
   let indexes = [];
   let currentFilteredGames = [];
   let visibleCount = 50;
+  let mappingModalIndexId = null;
   const fileInput = document.getElementById("json-input");
   const searchInput = document.getElementById("search-input");
   const resultsContainer = document.getElementById("results");
   const indexesListContainer = document.getElementById("indexes-list");
   const loadMoreBtn = document.getElementById("load-more-btn");
   const statsContainer = document.getElementById("stats-container");
+  const mappingModal = document.getElementById("mapping-modal");
+  const mapNameInput = document.getElementById("map-name");
+  const mapTitleSelect = document.getElementById("map-title");
+  const mapSubtitleSelect = document.getElementById("map-subtitle");
+  const mapLinkSelect = document.getElementById("map-link");
+  const mappingPreview = document.getElementById("mapping-preview");
+
+  function getSearchableText(item) {
+    const parts = [item.title, item.subtitle, item.source];
+    if (item.meta) parts.push(...Object.values(item.meta));
+    if (item.fileSize) parts.push(item.fileSize);
+    return parts.filter(Boolean).join(" ").toLowerCase();
+  }
+
   async function loadStoredIndexes() {
     try {
       const saved = await get("indexly_saved_indexes");
       if (saved) {
         indexes = saved.map((item) => {
-          const parsedGames = parseGameJson(item.rawData);
-          return { id: item.id, name: item.name, active: item.active, rawData: item.rawData, games: parsedGames };
+          const parsedGames = normalizeJson(item.rawData, item.name, item.mapping || null);
+          return { id: item.id, name: item.name, active: item.active, rawData: item.rawData, mapping: item.mapping || null, games: parsedGames };
         });
         if (indexes.length > 0) searchInput.removeAttribute("disabled");
       }
@@ -61,7 +105,7 @@
   }
   async function saveIndexesToStorage() {
     try {
-      const dataToSave = indexes.map((idx) => ({ id: idx.id, name: idx.name, active: idx.active, rawData: idx.rawData }));
+      const dataToSave = indexes.map((idx) => ({ id: idx.id, name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping || null }));
       await set("indexly_saved_indexes", dataToSave);
     } catch (e) { console.error(e); alert("⚠️ Error al guardar en IndexedDB."); }
   }
@@ -75,13 +119,20 @@
       try {
         const text = await file.text();
         const rawData = JSON.parse(text);
-        const parsedGames = parseGameJson(rawData);
-        const indexName = rawData.name || file.name.replace(".json", "");
+        const parsedGames = normalizeJson(rawData, file.name, null);
+        const indexName = (rawData && typeof rawData === "object" && !Array.isArray(rawData) && rawData.name) ? rawData.name : file.name.replace(/\.json$/i, "");
         const exists = indexes.some((idx) => idx.name.toLowerCase() === indexName.toLowerCase());
         if (exists) { duplicateNames.push(indexName); continue; }
-        indexes.push({ id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name: indexName, active: true, rawData, games: parsedGames });
+        if (parsedGames.length === 0) {
+          alert(`⚠️ "${file.name}" no contiene elementos reconocibles. Puedes ajustarlo manualmente tras cargarlo.`);
+          // still add with empty so user can map
+          indexes.push({ id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name: indexName, active: true, rawData, mapping: null, games: [] });
+          addedCount++;
+          continue;
+        }
+        indexes.push({ id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name: indexName, active: true, rawData, mapping: null, games: parsedGames });
         addedCount++;
-      } catch (error) { console.error(error); alert(`❌ Error en "${file.name}"`); }
+      } catch (error) { console.error(error); alert(`❌ Error en "${file.name}": ${error.message}`); }
     }
     if (duplicateNames.length > 0) alert(`⚠️ Ya existían y se omitieron:\n• ${duplicateNames.join("\n• ")}`);
     if (addedCount > 0) { searchInput.removeAttribute("disabled"); await saveIndexesToStorage(); updateApp(); }
@@ -95,12 +146,96 @@
     if (indexes.length === 0) { searchInput.setAttribute("disabled", "true"); searchInput.value = ""; }
     await saveIndexesToStorage(); updateApp();
   };
+
+  function fillSelect(select, keys, current, includeEmpty) {
+    select.innerHTML = "";
+    if (includeEmpty) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "— ninguno —";
+      select.appendChild(opt);
+    }
+    for (const k of keys) {
+      const opt = document.createElement("option");
+      opt.value = k;
+      opt.textContent = k;
+      if (k === current) opt.selected = true;
+      select.appendChild(opt);
+    }
+  }
+
+  function updateMappingPreview() {
+    const idx = indexes.find(i => i.id === mappingModalIndexId);
+    if (!idx) return;
+    const titleKey = mapTitleSelect.value;
+    const linkKey = mapLinkSelect.value;
+    const subtitleKey = mapSubtitleSelect.value;
+    if (!titleKey) { mappingPreview.textContent = "Selecciona un campo de Título"; return; }
+    try {
+      const preview = normalizeJson(idx.rawData, idx.name, { titleKey, linkKey: linkKey || null, subtitleKey: subtitleKey || null });
+      if (preview.length === 0) mappingPreview.textContent = "Sin elementos con ese mapeo";
+      else mappingPreview.textContent = `${preview.length} elementos · ej: "${preview[0].title}"${preview[0].link ? " · con enlace" : ""}`;
+    } catch (e) { mappingPreview.textContent = "Error en vista previa"; }
+  }
+
+  window.openMappingModal = function(id) {
+    const idx = indexes.find(i => i.id === id);
+    if (!idx) return;
+    mappingModalIndexId = id;
+    const keys = getAvailableKeys(idx.rawData);
+    if (keys.length === 0) {
+      alert("Este JSON no tiene campos mapeables (array de primitivos o estructura no soportada).");
+      return;
+    }
+    mapNameInput.value = idx.name || "";
+    const auto = getAutoMapping(idx.rawData);
+    const current = idx.mapping || auto;
+    fillSelect(mapTitleSelect, keys, current.titleKey || auto.titleKey || keys[0], false);
+    fillSelect(mapSubtitleSelect, keys, current.subtitleKey || auto.subtitleKey || "", true);
+    fillSelect(mapLinkSelect, keys, current.linkKey || auto.linkKey || "", true);
+    updateMappingPreview();
+    mappingModal.style.display = "flex";
+    mappingModal.setAttribute("aria-hidden", "false");
+    setTimeout(() => mapNameInput.focus(), 50);
+  };
+  window.closeMappingModal = function() {
+    mappingModal.style.display = "none";
+    mappingModal.setAttribute("aria-hidden", "true");
+    mappingModalIndexId = null;
+  };
+  window.saveMapping = async function() {
+    const idx = indexes.find(i => i.id === mappingModalIndexId);
+    if (!idx) return;
+    const newName = mapNameInput.value.trim();
+    if (!newName) { alert("El nombre no puede estar vacío."); return; }
+    const duplicate = indexes.some(x => x.id !== idx.id && x.name.toLowerCase() === newName.toLowerCase());
+    if (duplicate) { alert(`Ya existe otra fuente llamada "${newName}".`); return; }
+    const titleKey = mapTitleSelect.value;
+    if (!titleKey) { alert("Debes elegir un campo de Título."); return; }
+    const mapping = { titleKey, subtitleKey: mapSubtitleSelect.value || null, linkKey: mapLinkSelect.value || null };
+    idx.name = newName;
+    idx.mapping = mapping;
+    idx.games = normalizeJson(idx.rawData, idx.name, mapping);
+    await saveIndexesToStorage();
+    closeMappingModal();
+    updateApp();
+  };
+  mapTitleSelect.addEventListener("change", updateMappingPreview);
+  mapSubtitleSelect.addEventListener("change", updateMappingPreview);
+  mapLinkSelect.addEventListener("change", updateMappingPreview);
+  mappingModal.addEventListener("click", (e) => { if (e.target === mappingModal) closeMappingModal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && mappingModal.style.display !== "none") closeMappingModal(); });
+
   function updateApp() {
     renderIndexesManager();
     let activeGames = [];
     indexes.forEach((index) => { if (index.active) activeGames = activeGames.concat(index.games); });
-    const query = searchInput.value.toLowerCase();
-    currentFilteredGames = query.trim() === "" ? activeGames : activeGames.filter((g) => g.title.toLowerCase().includes(query));
+    const query = searchInput.value.toLowerCase().trim();
+    if (query === "") {
+      currentFilteredGames = activeGames;
+    } else {
+      currentFilteredGames = activeGames.filter((g) => getSearchableText(g).includes(query));
+    }
     visibleCount = 50;
     renderCurrentView();
   }
@@ -115,38 +250,77 @@
           <span class="status-dot"></span>
           <div class="index-text">
             <strong>${escapeHtml(index.name)}</strong>
-            <small>${index.games.length} juegos</small>
+            <small>${index.games.length.toLocaleString("es-ES")} elementos${index.mapping ? " · mapeado" : ""}</small>
           </div>
         </div>
         <div class="index-pill-actions">
+          <button class="action-btn map" onclick="openMappingModal('${index.id}')" title="Ajustar mapeo">⚙</button>
           <button class="action-btn toggle" onclick="toggleIndex('${index.id}')">${index.active ? "Desactivar" : "Activar"}</button>
           <button class="action-btn delete" onclick="removeIndex('${index.id}')" aria-label="Eliminar">✕</button>
         </div>
       </div>`).join("");
   }
-  function escapeHtml(str) { const d = document.createElement("div"); d.textContent = str; return d.innerHTML; }
+  function escapeHtml(str) { const d = document.createElement("div"); d.textContent = str == null ? "" : String(str); return d.innerHTML; }
+  function formatDateDDMMYY(val) {
+    if (!val || typeof val !== "string") return val;
+    const s = val.trim();
+    // ISO 8601 like 2026-04-04 or 2026-04-04T17:39:30+00:00
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[3]}/${iso[2]}/${iso[1].slice(2)}`;
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth()+1).padStart(2, "0");
+      const yy = String(d.getFullYear()).slice(2);
+      return `${dd}/${mm}/${yy}`;
+    }
+    return val;
+  }
+
+  function renderMetaBadges(meta) {
+    if (!meta || Object.keys(meta).length === 0) return "";
+    const labelLess = new Set(["tamaño","tamano","filesize","size","uploaddate","upload_date","fechasubida","fecha"]);
+    const dateKeys = new Set(["uploaddate","upload_date","fechasubida","fecha"]);
+    const entries = Object.entries(meta).slice(0, 3);
+    return entries.map(([k,v]) => {
+      const lk = k.toLowerCase();
+      const isLabelLess = labelLess.has(lk);
+      let displayVal = v;
+      if (dateKeys.has(lk)) displayVal = formatDateDDMMYY(String(v));
+      const text = isLabelLess ? escapeHtml(displayVal) : `${escapeHtml(k)}: ${escapeHtml(displayVal)}`;
+      const title = `${escapeHtml(k)}: ${escapeHtml(v)}`;
+      return `<span class="meta-badge" title="${title}">${text}</span>`;
+    }).join("");
+  }
+
   function renderCurrentView() {
     if (indexes.length === 0) {
       resultsContainer.innerHTML = ""; statsContainer.innerHTML = ""; loadMoreBtn.style.display = "none";
       searchInput.placeholder = "Sube un JSON arriba para empezar…"; return;
     }
     const totalMatches = currentFilteredGames.length;
-    searchInput.placeholder = `Buscar entre ${totalMatches.toLocaleString("es-ES")} juegos…`;
+    searchInput.placeholder = `Buscar entre ${totalMatches.toLocaleString("es-ES")} elementos…`;
     if (totalMatches === 0) {
       const q = searchInput.value.trim();
-      resultsContainer.innerHTML = `<div class="empty-results"><p class="no-results">${q ? `Sin resultados para “${escapeHtml(q)}”` : "No hay juegos en las fuentes activas."}</p><span>Prueba otro término o activa más fuentes.</span></div>`;
+      resultsContainer.innerHTML = `<div class="empty-results"><p class="no-results">${q ? `Sin resultados para “${escapeHtml(q)}”` : "No hay elementos en las fuentes activas."}</p><span>Prueba otro término o activa más fuentes.</span></div>`;
       statsContainer.innerHTML = ""; loadMoreBtn.style.display = "none"; return;
     }
     statsContainer.innerHTML = `Mostrando <strong>${Math.min(visibleCount, totalMatches).toLocaleString("es-ES")}</strong> de <strong>${totalMatches.toLocaleString("es-ES")}</strong>`;
     const gamesToRender = currentFilteredGames.slice(0, visibleCount);
-    resultsContainer.innerHTML = gamesToRender.map((game) => `
+    resultsContainer.innerHTML = gamesToRender.map((game) => {
+      const metaHtml = renderMetaBadges(game.meta);
+      const subtitleHtml = game.subtitle ? `<p class="game-subtitle">${escapeHtml(game.subtitle)}</p>` : "";
+      const hasMeta = metaHtml || game.fileSize && game.fileSize !== "Tamaño desconocido";
+      return `
       <div class="game-card">
         <div class="game-info-container">
           <h3>${escapeHtml(game.title)}</h3>
-          <p class="game-meta"><span class="source-badge">${escapeHtml(game.source)}</span><span class="meta-sep">·</span><span>${escapeHtml(game.fileSize)}</span></p>
+          ${subtitleHtml}
+          <p class="game-meta"><span class="source-badge">${escapeHtml(game.source)}</span>${hasMeta ? metaHtml : ""}</p>
         </div>
-        ${game.link ? `<a href="${escapeHtml(game.link)}" target="_blank" rel="noopener" class="magnet-link">Descargar <span>↗</span></a>` : '<span class="no-magnet">Sin enlace</span>'}
-      </div>`).join("");
+        ${game.link ? `<a href="${escapeHtml(game.link)}" target="_blank" rel="noopener" class="magnet-link">Abrir <span>↗</span></a>` : '<span class="no-magnet">Sin enlace</span>'}
+      </div>`;
+    }).join("");
     loadMoreBtn.style.display = visibleCount < totalMatches ? "inline-flex" : "none";
   }
   searchInput.addEventListener("input", () => updateApp());
@@ -272,6 +446,8 @@
   :global(.index-pill.active .action-btn.toggle) { background: var(--color-primary-soft); color: var(--color-primary); border-color: var(--color-primary-border); }
   :global(.action-btn.delete) { color: var(--color-text-tertiary); padding: 6px 8px; border-color: transparent; }
   :global(.action-btn.delete:hover) { background: rgba(239,68,68,0.08); color: #f87171; border-color: rgba(239,68,68,0.15); }
+  :global(.action-btn.map) { color: var(--color-text-tertiary); padding: 6px 8px; border-color: transparent; }
+  :global(.action-btn.map:hover) { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-border); }
   :global(.no-indexes) { font-size: var(--text-sm); color: var(--color-text-tertiary); margin: 0; text-align: center; }
   :global(.no-indexes span) { color: var(--color-text-secondary); font-weight: var(--weight-light); }
   .search-wrap { position: relative; margin-top: var(--space-8); }
@@ -303,13 +479,18 @@
   :global(.game-card:hover) { border-color: var(--color-border-hover); box-shadow: var(--shadow-subtle); transform: translateY(-1px); }
   :global(.game-info-container) { flex: 1; min-width: 0; }
   :global(.game-card h3) {
-    margin: 0 0 6px 0; font-size: var(--text-md); font-weight: var(--weight-medium); letter-spacing: var(--tracking-tight);
+    margin: 0 0 4px 0; font-size: var(--text-md); font-weight: var(--weight-medium); letter-spacing: var(--tracking-tight);
     line-height: 1.35; color: var(--color-text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
+  :global(.game-subtitle) { margin: 0 0 6px 0; font-size: var(--text-sm); color: var(--color-text-secondary); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   :global(.game-meta) { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-sm); color: var(--color-text-secondary); margin: 0; }
   :global(.source-badge) {
     background: transparent; color: var(--color-text-secondary); border: 1px solid var(--color-border);
     padding: 2px 7px; border-radius: var(--radius-full); font-size: 11px; font-weight: 500; max-width: 20ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  :global(.meta-badge) {
+    background: var(--color-surface-raised); color: var(--color-text-secondary); border: 1px solid var(--color-border);
+    padding: 2px 7px; border-radius: var(--radius-full); font-size: 11px; font-weight: 400; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   :global(.meta-sep) { color: var(--color-text-tertiary); }
   :global(.magnet-link) {
@@ -337,4 +518,31 @@
     :global(.game-card) { flex-direction: column; align-items: stretch; }
     :global(.magnet-link), :global(.no-magnet) { width: 100%; justify-content: center; }
   }
+  /* Mapping modal */
+  .mapping-overlay {
+    position: fixed; inset: 0; background: rgba(7,10,18,0.65); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center; z-index: 50; padding: var(--space-4);
+  }
+  .mapping-dialog {
+    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-xl);
+    padding: var(--space-6); max-width: 420px; width: 100%; box-shadow: var(--shadow-subtle);
+    display: flex; flex-direction: column; gap: var(--space-4);
+  }
+  .mapping-header { display: flex; justify-content: space-between; align-items: center; }
+  .mapping-header h4 { margin: 0; font-size: var(--text-md); font-weight: var(--weight-medium); color: var(--color-text); }
+  .mapping-close { background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-full); width: 28px; height: 28px; display: grid; place-items: center; cursor: pointer; color: var(--color-text-secondary); }
+  .mapping-close:hover { background: var(--color-surface-raised); color: var(--color-text); }
+  .mapping-desc { margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary); line-height: 1.4; }
+  .mapping-fields { display: flex; flex-direction: column; gap: var(--space-3); }
+  .mapping-label { display: flex; flex-direction: column; gap: 6px; font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--color-text); }
+  .mapping-label select, .mapping-input { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 8px 10px; color: var(--color-text); font-size: var(--text-sm); }
+  .mapping-label select:focus, .mapping-input:focus { outline: none; border-color: var(--color-border-hover); box-shadow: var(--shadow-focus); }
+  .mapping-hint { margin: 0; font-size: var(--text-xs); color: var(--color-text-secondary); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3); }
+  .mapping-hint span { color: var(--color-text); font-weight: var(--weight-medium); }
+  .mapping-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+  .mapping-btn { padding: 8px 14px; border-radius: var(--radius-full); font-size: var(--text-sm); font-weight: 500; cursor: pointer; border: 1px solid transparent; }
+  .mapping-btn.secondary { background: transparent; border-color: var(--color-border); color: var(--color-text-secondary); }
+  .mapping-btn.secondary:hover { background: var(--color-surface-raised); color: var(--color-text); }
+  .mapping-btn.primary { background: var(--color-text); color: var(--color-bg); }
+  .mapping-btn.primary:hover { opacity: 0.9; }
 </style>
