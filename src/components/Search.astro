@@ -20,7 +20,7 @@
         </button>
         <button type="button" id="export-btn" class="action-btn secondary" title="Descargar backup">Exportar</button>
         <button type="button" id="import-btn" class="action-btn secondary" title="Restaurar backup">Importar</button>
-        <input type="file" id="import-input" accept=".json" class="sr-only" tabindex="-1" />
+        <input type="file" id="import-input" accept=".json,.gz,application/gzip,application/json" class="sr-only" tabindex="-1" />
         <label for="json-input" class="file-label">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           Añadir archivo
@@ -160,6 +160,8 @@
 <script>
   import { normalizeJson, getAvailableKeys, getAutoMapping } from "../utils/normalizer";
   import { parseFileContent } from "../utils/loaders";
+  import { compactIndexes, inflateIndexes, migrateV1, isV2Envelope } from "../utils/exportCodec";
+  import { compressJsonToBlob, decompressBlobToText, hasCompressionSupport } from "../utils/compress";
   import { get, set } from "idb-keyval";
   let indexes = [];
   let currentFilteredGames = [];
@@ -448,18 +450,39 @@
     exportList.querySelectorAll('input[type="checkbox"]').forEach(c=>c.checked=v);
     updateExportUI();
   });
-  exportConfirm.addEventListener("click", ()=>{
+  exportConfirm.addEventListener("click", async ()=>{
     const ids = new Set(getSelectedIds(exportList));
     if (ids.size===0) return;
-    const data = indexes.filter(idx=>ids.has(idx.id)).map(idx=>({ id: idx.id, name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping }));
-    const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `indexly-backup-${new Date().toISOString().slice(0,10)}.json`;
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-    closeExportModal();
-    showToast(`${data.length} fuente(s) exportadas`, "success");
+    const selected = indexes.filter(idx=>ids.has(idx.id));
+    exportConfirm.disabled = true;
+    exportConfirm.textContent = "Comprimiendo…";
+    try {
+      const compact = compactIndexes(selected.map(idx=>({ name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping })));
+      const json = JSON.stringify(compact);
+      let blob, ext, type;
+      if (hasCompressionSupport()) {
+        blob = await compressJsonToBlob(json);
+        ext = "json.gz"; type = "application/gzip";
+      } else {
+        blob = new Blob([json], {type:"application/json"});
+        ext = "json"; type = "application/json";
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `indexly-backup-${new Date().toISOString().slice(0,10)}.${ext}`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      closeExportModal();
+      const prettySize = JSON.stringify(selected.map(idx=>({ id: idx.id, name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping }), null, 2)).length;
+      const savedPct = prettySize ? Math.round((1 - blob.size / prettySize)*100) : 0;
+      showToast(`${selected.length} fuente(s) exportadas · ${savedPct}% más pequeño`, "success");
+    } catch(err){
+      console.error(err);
+      showToast(`Error al exportar: ${err.message}`, "error");
+    } finally {
+      exportConfirm.disabled = false;
+      updateExportUI();
+    }
   });
   exportModal.addEventListener("click", (e)=>{ if(e.target===exportModal) closeExportModal(); });
   exportBtn.addEventListener("click", openExportModal);
@@ -528,9 +551,16 @@
     e.target.value = "";
     if (!file) return;
     try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      if (!Array.isArray(data)) throw new Error("Backup debe ser un array");
+      const text = await decompressBlobToText(file);
+      const parsed = JSON.parse(text);
+      let data;
+      if (isV2Envelope(parsed)) {
+        data = inflateIndexes(parsed);
+      } else if (Array.isArray(parsed)) {
+        data = migrateV1(parsed);
+      } else {
+        throw new Error("Backup debe ser un array o envelope v2");
+      }
       openImportSelectModal(data);
     } catch(err){ showToast(`Error en backup: ${err.message}`, "error"); }
   });
