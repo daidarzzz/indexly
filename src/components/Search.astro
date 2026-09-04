@@ -921,10 +921,21 @@
       if (blob.size > HUB_MAX_BYTES) throw new Error(`Archivo demasiado grande (${(blob.size/1024/1024).toFixed(1)}MB > 10MB)`);
       if (!headOk && blob.size === 0) throw new Error("Archivo vacío");
       const text = await decompressBlobToText(blob);
-      const rawData = JSON.parse(text);
-      const name = hubFileLabel(rawData, slugHint || fileUrl.pathname.split("/").pop().replace(/\.json\.gz$/i, "").replace(/\.gz$/i, "") || "Hub");
+      const parsed = JSON.parse(text);
+      // Importación PURA (igual que "Restaurar backup"): si es un envelope v2 o
+      // un backup v1, se reconstruyen sus fuentes originales con mappings.
+      // Solo el dato suelto entra como una fuente (vía "añadir archivo").
+      let items;
+      if (isV2Envelope(parsed)) {
+        items = inflateIndexes(parsed);
+      } else if (Array.isArray(parsed) && parsed.length > 0 && parsed.every((it) => it && typeof it === "object" && !Array.isArray(it) && "rawData" in it)) {
+        items = migrateV1(parsed);
+      } else {
+        const name = hubFileLabel(parsed, slugHint || fileUrl.pathname.split("/").pop().replace(/\.json\.gz$/i, "").replace(/\.gz$/i, "") || "Hub");
+        items = [{ name, rawData: parsed, mapping: mappingHint, active: true }];
+      }
       cleanHubParams();
-      openImportSelectModal([{ name, rawData, mapping: mappingHint, active: true }]);
+      openImportSelectModal(items);
     } catch (err) {
       console.error(err);
       cleanHubParams();
