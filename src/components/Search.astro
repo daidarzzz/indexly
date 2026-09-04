@@ -345,10 +345,12 @@
     let addedCount = 0; let duplicateNames = [];
     for (const file of files) {
       try {
-        const text = await file.text();
+        // decompressBlobToText es superconjunto de file.text(): los .gz se
+        // descomprimen y el resto pasa tal cual (permite arrastrar .json.gz del Hub)
+        const text = await decompressBlobToText(file);
         const rawData = parseFileContent(text, file.name);
         const parsedGames = normalizeJson(rawData, file.name, null);
-        const baseName = file.name.replace(/\.[^.]+$/i, "");
+        const baseName = file.name.replace(/\.json\.gz$/i, "").replace(/\.gz$/i, "").replace(/\.[^.]+$/i, "");
         const indexName = (rawData && typeof rawData === "object" && !Array.isArray(rawData) && rawData.name) ? rawData.name : baseName;
         const exists = indexes.some((idx) => idx.name.toLowerCase() === indexName.toLowerCase());
         if (exists) { duplicateNames.push(indexName); continue; }
@@ -381,9 +383,9 @@
   ["dragenter","dragover"].forEach(ev => dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); }));
   ["dragleave","drop"].forEach(ev => dropZone.addEventListener(ev, (e) => { e.preventDefault(); if (ev==="dragleave" && e.target!==dropZone) return; dropZone.classList.remove("drag-over"); }));
   dropZone.addEventListener("drop", async (e) => {
-    const allowed = [".json",".csv",".tsv",".yaml",".yml",".xml",".txt"];
+    const allowed = [".json",".json.gz",".gz",".csv",".tsv",".yaml",".yml",".xml",".txt"];
     const files = Array.from(e.dataTransfer.files || []).filter(f => allowed.some(ext=>f.name.toLowerCase().endsWith(ext)));
-    if (files.length === 0) { showToast("Arrastra archivos .json/.csv/.yaml/.xml/.txt", "warning"); return; }
+    if (files.length === 0) { showToast("Arrastra archivos .json/.json.gz/.csv/.yaml/.xml/.txt", "warning"); return; }
     await handleFiles(files);
   });
   // Paste archivos
@@ -841,7 +843,99 @@
       e.preventDefault(); searchInput.focus();
     }
   });
-  loadStoredIndexes();
+  // Importación desde IndexlyHub (?import=<url-archivo>&name=<slug>&mapping=<json>)
+  // Descarga el .json.gz del Hub y abre el MENÚ DE IMPORTACIÓN EXISTENTE
+  // (openImportSelectModal): flujo 100% normal — duplicados, conteo, confirmación.
+  // Todo client-side: nada sale de este navegador salvo el GET al archivo.
+  const HUB_MAX_BYTES = 10 * 1024 * 1024;
+  function isAllowedHubUrl(u) {
+    if (u.protocol !== "https:" && u.hostname !== "localhost" && u.hostname !== "127.0.0.1") return false;
+    if (u.hostname === "localhost" || u.hostname === "127.0.0.1") return true;
+    return u.origin === "https://files.indexlyhub.daida.net";
+  }
+  function cleanHubParams() {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("import");
+      url.searchParams.delete("name");
+      url.searchParams.delete("mapping");
+      history.replaceState(null, "", url);
+    } catch {}
+  }
+  function hubFileLabel(rawData, fallback) {
+    if (rawData && typeof rawData === "object" && !Array.isArray(rawData) && typeof rawData.name === "string" && rawData.name.trim()) {
+      return rawData.name.trim().slice(0, 100);
+    }
+    return fallback;
+  }
+  async function handleHubImport() {
+    let rawParam = null;
+    try { rawParam = new URL(window.location.href).searchParams.get("import"); } catch { return; }
+    if (!rawParam) return;
+    const params = new URL(window.location.href).searchParams;
+    // Formato antiguo (el Hub ya no lo emite): no se rompe en silencio
+    if (!rawParam.startsWith("http")) {
+      cleanHubParams();
+      showToast("Enlace antiguo no soportado: ábrelo de nuevo desde el Hub", "warning", 5000);
+      return;
+    }
+    let fileUrl;
+    try {
+      fileUrl = new URL(rawParam);
+    } catch {
+      cleanHubParams();
+      showToast("Enlace de importación inválido", "error");
+      return;
+    }
+    if (!isAllowedHubUrl(fileUrl)) {
+      cleanHubParams();
+      showToast("Origen de importación no permitido", "error");
+      return;
+    }
+    const slugHint = (params.get("name") || "").trim().slice(0, 100);
+    let mappingHint = null;
+    try {
+      const m = params.get("mapping");
+      if (m) {
+        const parsed = JSON.parse(m);
+        if (parsed && typeof parsed === "object" && typeof parsed.titleKey === "string") mappingHint = parsed;
+      }
+    } catch {}
+    showToast("Descargando paquete del Hub…", "info", 4000);
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 30000);
+      let headOk = true;
+      try {
+        const head = await fetch(fileUrl.toString(), { method: "HEAD", signal: ctrl.signal });
+        const len = Number(head.headers.get("content-length") || "0");
+        if (len > HUB_MAX_BYTES) { clearTimeout(timer); throw new Error(`Archivo demasiado grande (${(len/1024/1024).toFixed(1)}MB > 10MB)`); }
+      } catch (e) {
+        if (e.name === "AbortError") throw e;
+        headOk = false; // algunos orígenes no soportan HEAD: se valida con el tamaño real
+      }
+      const resp = await fetch(fileUrl.toString(), { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error(`Descarga falló (${resp.status})`);
+      const blob = await resp.blob();
+      if (blob.size > HUB_MAX_BYTES) throw new Error(`Archivo demasiado grande (${(blob.size/1024/1024).toFixed(1)}MB > 10MB)`);
+      if (!headOk && blob.size === 0) throw new Error("Archivo vacío");
+      const text = await decompressBlobToText(blob);
+      const rawData = JSON.parse(text);
+      const name = hubFileLabel(rawData, slugHint || fileUrl.pathname.split("/").pop().replace(/\.json\.gz$/i, "").replace(/\.gz$/i, "") || "Hub");
+      cleanHubParams();
+      openImportSelectModal([{ name, rawData, mapping: mappingHint, active: true }]);
+    } catch (err) {
+      console.error(err);
+      cleanHubParams();
+      const msg = err && err.name === "AbortError" ? "Descarga agotó el tiempo (30s)" : (err.message || "Error al descargar");
+      showToast(`${msg}`, "error", 7000, {
+        label: "Abrir archivo",
+        onClick: async () => { window.open(fileUrl.toString(), "_blank", "noopener"); },
+      });
+    }
+  }
+  loadStoredIndexes().then(() => handleHubImport()).catch(() => handleHubImport());
 </script>
 
 <style>
