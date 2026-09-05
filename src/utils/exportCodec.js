@@ -1,5 +1,6 @@
 // src/utils/exportCodec.js — compact lossless export codec v2
-// Envelope v2: { v:2, s:[{n, a?, m?, d}] }  + tabular {k,v} for homogeneous arrays
+// Envelope v2: { v:2, s:[{n, a?, m?, d, p?}] }  + tabular {k,v} for homogeneous arrays
+// p = paquete (carpeta): [slug, name?, version?, r2Url?] — marca de IndexlyHub.
 // Falls back to raw copy for heterogeneous / small arrays. Fully round-trippable.
 
 function genId() {
@@ -7,6 +8,27 @@ function genId() {
     if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
   } catch {}
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+// Marca de paquete: tupla compacta con trailing nulls omitidos.
+function compactPkg(pkg) {
+  if (!pkg || !pkg.slug) return undefined;
+  const tup = [String(pkg.slug)];
+  const name = pkg.name && pkg.name !== pkg.slug ? String(pkg.name) : null;
+  if (pkg.version != null || pkg.r2Url != null || name != null) tup.push(name);
+  if (pkg.version != null || pkg.r2Url != null) tup.push(pkg.version ?? null);
+  if (pkg.r2Url != null) tup.push(pkg.r2Url);
+  return tup;
+}
+
+function restorePkg(p) {
+  if (Array.isArray(p) && p.length > 0 && p[0]) {
+    return { slug: String(p[0]), name: String(p[1] || p[0]), version: p[2] ?? null, r2Url: p[3] ?? null };
+  }
+  if (p && typeof p === "object" && p.slug) {
+    return { slug: String(p.slug), name: String(p.name || p.slug), version: p.version ?? null, r2Url: p.r2Url ?? null };
+  }
+  return null;
 }
 
 // Try to compact a rawData value that may contain an array.
@@ -153,6 +175,8 @@ export function compactIndexes(indexes) {
     }
     const d = compactData(idx.rawData, idx.name);
     entry.d = d;
+    const pk = compactPkg(idx.pkg);
+    if (pk) entry.p = pk;
     return entry;
   });
   return { v: 2, s };
@@ -191,6 +215,7 @@ export function inflateIndexes(parsed) {
       active,
       rawData,
       mapping,
+      pkg: restorePkg(entry.p),
     };
   });
 }
@@ -207,6 +232,7 @@ export function migrateV1(arr) {
       active: item.active === false ? false : true,
       rawData: item.rawData,
       mapping: item.mapping || null,
+      pkg: restorePkg(item.pkg),
     };
   });
 }

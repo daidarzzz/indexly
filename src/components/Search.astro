@@ -375,7 +375,7 @@
       if (saved) {
         indexes = saved.map((item) => {
           const parsedGames = normalizeJson(item.rawData, item.name, item.mapping || null);
-          return { id: item.id, name: item.name, active: item.active, rawData: item.rawData, mapping: item.mapping || null, games: parsedGames };
+          return { id: item.id, name: item.name, active: item.active, rawData: item.rawData, mapping: item.mapping || null, pkg: item.pkg || null, games: parsedGames };
         });
         if (indexes.length > 0) searchInput.removeAttribute("disabled");
       }
@@ -386,7 +386,7 @@
   }
   async function saveIndexesToStorage() {
     try {
-      const dataToSave = indexes.map((idx) => ({ id: idx.id, name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping || null }));
+      const dataToSave = indexes.map((idx) => ({ id: idx.id, name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping || null, pkg: idx.pkg || null }));
       await set("indexly_saved_indexes", dataToSave);
     } catch (e) { console.error(e); showToast("Error al guardar en IndexedDB", "error"); }
   }
@@ -406,11 +406,11 @@
         if (exists) { duplicateNames.push(indexName); continue; }
         if (parsedGames.length === 0) {
           showToast(`"${file.name}" sin elementos reconocibles — puedes mapearlo`, "warning", 4000);
-          indexes.push({ id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name: indexName, active: true, rawData, mapping: null, games: [] });
+          indexes.push({ id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name: indexName, active: true, rawData, mapping: null, pkg: null, games: [] });
           addedCount++;
           continue;
         }
-        indexes.push({ id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name: indexName, active: true, rawData, mapping: null, games: parsedGames });
+        indexes.push({ id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name: indexName, active: true, rawData, mapping: null, pkg: null, games: parsedGames });
         addedCount++;
       } catch (error) { console.error(error); showToast(`Error en "${file.name}": ${error.message}`, "error"); }
     }
@@ -453,7 +453,7 @@
       e.preventDefault();
       const indexName = (rawData && rawData.name) ? rawData.name : `Pegado ${new Date().toLocaleTimeString()}`;
       if (indexes.some(x=>x.name.toLowerCase()===indexName.toLowerCase())) { showToast("Ya existe una fuente con ese nombre", "warning"); return; }
-      indexes.push({ id: Date.now().toString()+Math.random().toString(36).substring(2,7), name: indexName, active:true, rawData, mapping:null, games: parsedGames });
+      indexes.push({ id: Date.now().toString()+Math.random().toString(36).substring(2,7), name: indexName, active:true, rawData, mapping:null, pkg: null, games: parsedGames });
       searchInput.removeAttribute("disabled");
       await saveIndexesToStorage(); updateApp();
       showToast(`Fuente "${indexName}" creada desde portapapeles`, "success");
@@ -488,7 +488,10 @@
     exportList.innerHTML = indexes.map(idx=>{
       const count = idx.games.length;
       const full = count.toLocaleString("es-ES");
-      const status = idx.mapping ? "mapeado" : "";
+      const tags = [];
+      if (idx.pkg && idx.pkg.slug) tags.push(idx.pkg.name || idx.pkg.slug);
+      if (idx.mapping) tags.push("mapeado");
+      const status = tags.join(" · ");
       return `<label class="io-item"><input type="checkbox" value="${escapeHtml(idx.id)}" checked /><span class="io-item-dot" aria-hidden="true"></span><span class="io-item-info"><strong>${escapeHtml(idx.name)}</strong><small>${escapeHtml(status)}</small></span><span class="io-item-meta"><span class="io-item-badge" title="${escapeHtml(full)} elementos">${escapeHtml(fmtCompact(count))}</span></span></label>`;
     }).join("");
     exportList.querySelectorAll('input[type="checkbox"]').forEach(cb=> cb.addEventListener("change", updateExportUI));
@@ -509,7 +512,7 @@
     exportConfirm.disabled = true;
     exportConfirm.textContent = "Comprimiendo…";
     try {
-      const compact = compactIndexes(selected.map(idx=>({ name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping })));
+      const compact = compactIndexes(selected.map(idx=>({ name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping, pkg: idx.pkg || null })));
       const json = JSON.stringify(compact);
       let blob, ext, type;
       if (hasCompressionSupport()) {
@@ -525,7 +528,7 @@
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
       closeExportModal();
-      const prettySize = JSON.stringify(selected.map(idx=>({ id: idx.id, name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping }), null, 2)).length;
+      const prettySize = JSON.stringify(selected.map(idx=>({ id: idx.id, name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping, pkg: idx.pkg || null }), null, 2)).length;
       const savedPct = prettySize ? Math.round((1 - blob.size / prettySize)*100) : 0;
       showToast(`${selected.length} fuente(s) exportadas · ${savedPct}% más pequeño`, "success");
     } catch(err){
@@ -563,7 +566,10 @@
       const reason = !item.rawData ? "sin datos" : "ya existe";
       const count = (()=>{ try{ const p=normalizeJson(item.rawData, name, item.mapping||null); return p.length; } catch{ return 0; } })();
       const full = count.toLocaleString("es-ES");
-      const status = isDup ? reason : "";
+      const tags = [];
+      if (item.pkg && item.pkg.slug) tags.push(item.pkg.name || item.pkg.slug);
+      if (isDup) tags.push(reason);
+      const status = tags.join(" · ");
       return `<label class="io-item ${isDup ? "is-disabled" : ""}"><input type="checkbox" value="${i}" ${isDup ? "disabled" : "checked"} /><span class="io-item-dot" aria-hidden="true"></span><span class="io-item-info"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(status)}</small></span><span class="io-item-meta"><span class="io-item-badge" title="${escapeHtml(full)} elementos">${escapeHtml(fmtCompact(count))}</span></span></label>`;
     }).join("");
     importSelectList.querySelectorAll('input[type="checkbox"]:not([disabled])').forEach(cb=> cb.addEventListener("change", updateImportUI));
@@ -587,7 +593,7 @@
       if (!item || !item.rawData) { skipped.push(String(item?.name||i)); continue; }
       if (indexes.some(x=>x.name.toLowerCase()===String(item.name).toLowerCase())) { skipped.push(item.name); continue; }
       const parsed = normalizeJson(item.rawData, item.name, item.mapping || null);
-      indexes.push({ id: Date.now().toString()+Math.random().toString(36).substring(2,7), name: item.name, active: item.active ?? true, rawData: item.rawData, mapping: item.mapping||null, games: parsed });
+      indexes.push({ id: Date.now().toString()+Math.random().toString(36).substring(2,7), name: item.name, active: item.active ?? true, rawData: item.rawData, mapping: item.mapping||null, pkg: item.pkg||null, games: parsed });
       imported++;
     }
     const hadSkipped = skipped.length>0;
@@ -776,6 +782,79 @@
     renderSearch();
     updateQuotaInfo();
   }
+  // Paquetes (carpetas): agrupan fuentes importadas desde IndexlyHub.
+  // Si el paquete trae una sola fuente, se muestra como pill normal, sin carpeta.
+  function getPkgCollapsedMap() {
+    try { return JSON.parse(localStorage.getItem("indexly_pkg_collapsed") || "{}") || {}; }
+    catch { return {}; }
+  }
+  function isPkgCollapsed(slug) {
+    try { return !!getPkgCollapsedMap()[slug]; } catch { return false; }
+  }
+  window.togglePkgCollapsed = function(slug) {
+    try {
+      const m = getPkgCollapsedMap();
+      m[slug] = !m[slug];
+      localStorage.setItem("indexly_pkg_collapsed", JSON.stringify(m));
+    } catch {}
+    updateApp();
+  };
+  window.togglePkg = async function (slug) {
+    const items = indexes.filter(i => i.pkg && i.pkg.slug === slug);
+    if (!items.length) return;
+    const target = !items.every(i => i.active);
+    items.forEach(i => i.active = target);
+    await saveIndexesToStorage(); updateApp();
+    showToast(target ? `Paquete "${slug}" activado` : `Paquete "${slug}" desactivado`, "success");
+  };
+  window.removePkg = async function (slug) {
+    const items = indexes.filter(i => i.pkg && i.pkg.slug === slug);
+    if (!items.length) return;
+    const label = (items[0].pkg && items[0].pkg.name) || slug;
+    showConfirm(`¿Eliminar paquete "${label}" (${items.length} fuentes)?`, async () => {
+      if (undoTimer) clearTimeout(undoTimer);
+      const firstIdx = indexes.findIndex(x => x.pkg && x.pkg.slug === slug);
+      lastRemoved = { data: items, index: Math.max(0, firstIdx), isPkg: true };
+      const ids = new Set(items.map(i => i.id));
+      indexes = indexes.filter(i => !ids.has(i.id));
+      if (indexes.length === 0) { searchInput.setAttribute("disabled", "true"); searchInput.value = ""; }
+      await saveIndexesToStorage(); updateApp();
+      showToast(`Paquete "${label}" eliminado`, "info", 6000, {
+        label: "Deshacer",
+        onClick: async () => {
+          if (lastRemoved && lastRemoved.isPkg && Array.isArray(lastRemoved.data)) {
+            const pos = Math.min(lastRemoved.index, indexes.length);
+            indexes.splice(pos, 0, ...lastRemoved.data);
+            lastRemoved = null;
+            if (undoTimer) { clearTimeout(undoTimer); undoTimer = null; }
+            if (indexes.length >= 1) searchInput.removeAttribute("disabled");
+            await saveIndexesToStorage(); updateApp();
+            showToast("Paquete restaurado", "success");
+          }
+        }
+      });
+      undoTimer = setTimeout(()=>{ lastRemoved = null; }, 6500);
+    });
+  };
+  function indexPillHtml(index) {
+    const coverBg = coverGradientStyle(index.name);
+    const initial = (String(index.name || "?").trim().charAt(0) || "?").toUpperCase();
+    return `
+      <div class="index-pill ${index.active ? "active" : "inactive"}">
+        <div class="index-pill-info">
+          <span class="index-avatar" style="background:${coverBg}" aria-hidden="true">${escapeHtml(initial)}</span>
+          <div class="index-text">
+            <strong>${escapeHtml(index.name)}</strong>
+            <small>${index.games.length.toLocaleString("es-ES")} elementos${index.mapping ? ' <span class="mapped-badge">mapeado</span>' : ""}${index.active ? "" : " · desactivada"}</small>
+          </div>
+        </div>
+        <div class="index-pill-actions">
+          <button type="button" class="action-btn map" onclick="openMappingModal('${index.id}')" title="Ajustar mapeo" aria-label="Ajustar ${escapeHtml(index.name)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+          <button type="button" class="index-switch" role="switch" aria-checked="${index.active ? "true" : "false"}" aria-label="${index.active ? "Desactivar" : "Activar"} ${escapeHtml(index.name)}" title="${index.active ? "Desactivar" : "Activar"}" onclick="toggleIndex('${index.id}')"><span class="knob" aria-hidden="true"></span></button>
+          <button type="button" class="action-btn delete" onclick="removeIndex('${index.id}')" title="Eliminar" aria-label="Eliminar ${escapeHtml(index.name)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        </div>
+      </div>`;
+  }
   function renderIndexesManager() {
     const countEl = document.getElementById("fuentes-count");
     const summaryEl = document.getElementById("bulk-summary");
@@ -790,23 +869,54 @@
     if (countEl) countEl.textContent = `${indexes.length}`;
     if (summaryEl) summaryEl.textContent = `${indexes.length} ${indexes.length === 1 ? "fuente" : "fuentes"} · ${totalGames.toLocaleString("es-ES")} elementos · ${activeCount === 1 ? "1 activa" : `${activeCount} activas`}`;
     bulkActions.style.display = "flex";
-    indexesListContainer.innerHTML = indexes.map((index) => {
-      const coverBg = coverGradientStyle(index.name);
-      const initial = (String(index.name || "?").trim().charAt(0) || "?").toUpperCase();
+    const groups = new Map();
+    const order = [];
+    for (const index of indexes) {
+      const slug = index.pkg && index.pkg.slug;
+      if (!slug) { order.push({ type: "single", index }); continue; }
+      if (!groups.has(slug)) { groups.set(slug, { pkg: index.pkg, items: [] }); order.push({ type: "group", slug }); }
+      else if (index.pkg && index.pkg.name) { groups.get(slug).pkg = index.pkg; }
+      groups.get(slug).items.push(index);
+    }
+    indexesListContainer.innerHTML = order.map((entry) => {
+      if (entry.type === "single") return indexPillHtml(entry.index);
+      const g = groups.get(entry.slug);
+      if (!g) return "";
+      if (g.items.length <= 1) return indexPillHtml(g.items[0]);
+      const pkgName = (g.pkg && g.pkg.name) || entry.slug;
+      const coverBg = coverGradientStyle(pkgName);
+      const initial = (String(pkgName || "?").trim().charAt(0) || "?").toUpperCase();
+      const total = g.items.reduce((a, i) => a + (i.games ? i.games.length : 0), 0);
+      const activeCount = g.items.filter(i => i.active).length;
+      const allActive = activeCount === g.items.length;
+      const noneActive = activeCount === 0;
+      const collapsed = isPkgCollapsed(entry.slug);
+      const stateCls = allActive ? "active" : (noneActive ? "inactive" : "active");
+      const checked = allActive ? "true" : (noneActive ? "false" : "mixed");
+      const sub = noneActive
+        ? `${g.items.length} fuentes · ${total.toLocaleString("es-ES")} elementos · desactivado`
+        : (allActive
+          ? `${g.items.length} fuentes · ${total.toLocaleString("es-ES")} elementos`
+          : `${g.items.length} fuentes · ${total.toLocaleString("es-ES")} elementos · ${activeCount} activas`);
       return `
-      <div class="index-pill ${index.active ? "active" : "inactive"}">
-        <div class="index-pill-info">
-          <span class="index-avatar" style="background:${coverBg}" aria-hidden="true">${escapeHtml(initial)}</span>
-          <div class="index-text">
-            <strong>${escapeHtml(index.name)}</strong>
-            <small>${index.games.length.toLocaleString("es-ES")} elementos${index.mapping ? ' <span class="mapped-badge">mapeado</span>' : ""}${index.active ? "" : " · desactivada"}</small>
+      <div class="pkg-group ${collapsed ? "collapsed" : ""}">
+        <div class="index-pill pkg-header ${stateCls}">
+          <button type="button" class="pkg-chevron" onclick="togglePkgCollapsed('${entry.slug}')" aria-expanded="${collapsed ? "false" : "true"}" aria-label="${collapsed ? "Expandir" : "Colapsar"} paquete ${escapeHtml(pkgName)}" title="${collapsed ? "Expandir" : "Colapsar"}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="index-pill-info">
+            <span class="index-avatar" style="background:${coverBg}" aria-hidden="true">${escapeHtml(initial)}</span>
+            <div class="index-text">
+              <strong>${escapeHtml(pkgName)}</strong>
+              <small>${escapeHtml(sub)}</small>
+            </div>
+          </div>
+          <div class="index-pill-actions">
+            <button type="button" class="index-switch" role="switch" aria-checked="${checked}" aria-label="${allActive ? "Desactivar" : "Activar"} paquete ${escapeHtml(pkgName)}" title="${allActive ? "Desactivar todo" : "Activar todo"}" onclick="togglePkg('${entry.slug}')"><span class="knob" aria-hidden="true"></span></button>
+            <button type="button" class="action-btn delete" onclick="removePkg('${entry.slug}')" title="Eliminar paquete" aria-label="Eliminar paquete ${escapeHtml(pkgName)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
           </div>
         </div>
-        <div class="index-pill-actions">
-          <button type="button" class="action-btn map" onclick="openMappingModal('${index.id}')" title="Ajustar mapeo" aria-label="Ajustar ${escapeHtml(index.name)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
-          <button type="button" class="index-switch" role="switch" aria-checked="${index.active ? "true" : "false"}" aria-label="${index.active ? "Desactivar" : "Activar"} ${escapeHtml(index.name)}" title="${index.active ? "Desactivar" : "Activar"}" onclick="toggleIndex('${index.id}')"><span class="knob" aria-hidden="true"></span></button>
-          <button type="button" class="action-btn delete" onclick="removeIndex('${index.id}')" title="Eliminar" aria-label="Eliminar ${escapeHtml(index.name)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
-        </div>
+        <div class="pkg-children">${g.items.map(indexPillHtml).join("")}</div>
       </div>`;
     }).join("");
   }
@@ -983,6 +1093,11 @@
     }
     return fallback;
   }
+  // Slug seguro para la marca de paquete (sin comillas: apto para onclick="…'slug'…")
+  function sanitizePkgSlug(s, fallback) {
+    const clean = String(s || "").replace(/[^a-zA-Z0-9áéíóúñüÁÉÍÓÚÑÜ _.\-]/g, "").trim().slice(0, 60);
+    return clean || fallback;
+  }
   async function handleHubImport() {
     let rawParam = null;
     try { rawParam = new URL(window.location.href).searchParams.get("import"); } catch { return; }
@@ -1040,14 +1155,20 @@
       // Importación PURA (igual que "Restaurar backup"): si es un envelope v2 o
       // un backup v1, se reconstruyen sus fuentes originales con mappings.
       // Solo el dato suelto entra como una fuente (vía "añadir archivo").
+      // Todo lo venido del Hub lleva marca de paquete (carpeta si trae >1 fuente).
+      const pkgSlug = sanitizePkgSlug(slugHint, "hub");
+      const outerPkg = { slug: pkgSlug, name: (slugHint || pkgSlug).slice(0, 100), version: null, r2Url: fileUrl.toString() };
+      const withPkg = (list) => (Array.isArray(list) ? list : []).map((it) => (
+        it && typeof it === "object" ? { ...it, pkg: (it.pkg && it.pkg.slug) ? it.pkg : outerPkg } : it
+      ));
       let items;
       if (isV2Envelope(parsed)) {
-        items = inflateIndexes(parsed);
+        items = withPkg(inflateIndexes(parsed));
       } else if (Array.isArray(parsed) && parsed.length > 0 && parsed.every((it) => it && typeof it === "object" && !Array.isArray(it) && "rawData" in it)) {
-        items = migrateV1(parsed);
+        items = withPkg(migrateV1(parsed));
       } else {
         const name = hubFileLabel(parsed, slugHint || fileUrl.pathname.split("/").pop().replace(/\.json\.gz$/i, "").replace(/\.gz$/i, "") || "Hub");
-        items = [{ name, rawData: parsed, mapping: mappingHint, active: true }];
+        items = [{ name, rawData: parsed, mapping: mappingHint, active: true, pkg: outerPkg }];
       }
       cleanHubParams();
       openImportSelectModal(items);
@@ -1320,6 +1441,15 @@
   :global(.index-switch:focus-visible) { outline: 1px solid var(--color-primary); outline-offset: 2px; }
   :global(.index-switch[aria-checked="true"]) { background: rgba(14,165,233,0.22); border-color: var(--color-primary-border); }
   :global(.index-switch[aria-checked="true"] .knob) { left: 18px; background: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); }
+  /* Paquetes (carpetas) — reutilizan .index-pill/.index-avatar/.index-switch; solo añaden indent + chevron */
+  :global(.pkg-group) { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+  :global(.pkg-header) { cursor: default; }
+  :global(.pkg-chevron) { width: 22px; height: 22px; display: grid; place-items: center; background: transparent; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-text-tertiary); cursor: pointer; flex-shrink: 0; padding: 0; }
+  :global(.pkg-chevron:hover) { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-border-strong); }
+  :global(.pkg-chevron svg) { transition: transform 0.15s ease; }
+  :global(.pkg-group.collapsed .pkg-chevron svg) { transform: rotate(-90deg); }
+  :global(.pkg-children) { display: flex; flex-direction: column; gap: var(--space-2); margin-left: 11px; padding-left: 12px; border-left: 1px solid var(--color-border); }
+  :global(.pkg-group.collapsed .pkg-children) { display: none; }
   :global(.no-indexes) { font-size: var(--text-sm); color: var(--color-text-tertiary); margin: 0; text-align: center; }
   :global(.no-indexes span) { color: var(--color-text-secondary); font-weight: var(--weight-light); }
   .search-wrap { position: relative; margin-top: var(--space-8); }
