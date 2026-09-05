@@ -10,7 +10,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a1a9b8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12H14l-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6l2 2h8a2 2 0 0 1 2 2v4Z"/><path d="M14 14v6H4a2 2 0 0 1-2-2v-6"/></svg>
         </div>
         <div>
-          <h3>Fuentes</h3>
+          <h3>Fuentes <span id="fuentes-count" class="fuentes-count" aria-live="polite"></span></h3>
           <p class="manager-desc">Gestiona tus índices activos</p>
         </div>
       </div>
@@ -18,9 +18,15 @@
         <button type="button" id="collapse-fuentes" class="collapse-btn" aria-expanded="true" aria-controls="indexes-list bulk-actions" aria-label="Comprimir fuentes" title="Comprimir">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
         </button>
-        <button type="button" id="export-btn" class="action-btn secondary" title="Descargar backup">Exportar</button>
-        <button type="button" id="import-btn" class="action-btn secondary" title="Restaurar backup">Importar</button>
-        <input type="file" id="import-input" accept=".json" class="sr-only" tabindex="-1" />
+        <button type="button" id="export-btn" class="action-btn secondary" title="Descargar backup">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3M8 7l4-4 4 4"/><path d="M20 16v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2"/></svg>
+          Exportar
+        </button>
+        <button type="button" id="import-btn" class="action-btn secondary" title="Restaurar backup">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13M8 12l4 4 4-4"/><path d="M20 16v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2"/></svg>
+          Importar
+        </button>
+        <input type="file" id="import-input" accept=".json,.gz,application/gzip,application/json" class="sr-only" tabindex="-1" />
         <label for="json-input" class="file-label">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           Añadir archivo
@@ -32,11 +38,19 @@
       <p class="no-indexes">No hay índices cargados todavía.</p>
     </div>
     <div id="bulk-actions" class="bulk-actions" style="display:none">
-      <button type="button" id="bulk-enable" class="bulk-btn">Activar todo</button>
-      <button type="button" id="bulk-disable" class="bulk-btn">Desactivar todo</button>
-      <button type="button" id="bulk-clear" class="bulk-btn danger">Borrar todo</button>
+      <span id="bulk-summary" class="bulk-summary" aria-live="polite"></span>
+      <div class="bulk-tools">
+        <div class="bulk-seg" role="group" aria-label="Activar o desactivar todo">
+          <button type="button" id="bulk-enable" class="bulk-seg-btn">Activar todo</button>
+          <button type="button" id="bulk-disable" class="bulk-seg-btn">Desactivar todo</button>
+        </div>
+        <button type="button" id="bulk-clear" class="bulk-clear">Borrar todo</button>
+      </div>
     </div>
-    <p class="drop-hint">Arrastra archivos aquí o pega con Ctrl+V</p>
+    <p class="drop-hint">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3M8 7l4-4 4 4"/><path d="M20 16v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2"/></svg>
+      Arrastra archivos aquí o pega con <kbd>Ctrl</kbd> + <kbd>V</kbd>
+    </p>
   </div>
   <div class="search-wrap">
     <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -48,6 +62,7 @@
       <button type="button" class="chip" data-filter="link">Con enlace</button>
       <button type="button" class="chip" data-filter="nolink">Sin enlace</button>
     </div>
+    <span class="controls-sep" aria-hidden="true"></span>
     <select id="sort-select" class="sort-select" aria-label="Ordenar">
       <option value="relevance">Relevancia</option>
       <option value="title-asc">Título A-Z</option>
@@ -57,6 +72,17 @@
       <option value="date-desc">Fecha reciente</option>
       <option value="date-asc">Fecha antigua</option>
     </select>
+    <span class="controls-sep" aria-hidden="true"></span>
+    <div class="view-toggle" role="group" aria-label="Vista de resultados">
+      <button type="button" class="chip view-btn active" data-view="list" aria-pressed="true" title="Vista de lista">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg>
+        Lista
+      </button>
+      <button type="button" class="chip view-btn" data-view="grid" aria-pressed="false" title="Vista de cuadrícula">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Cuadrícula
+      </button>
+    </div>
   </div>
   <div id="quota-info" class="quota-info" aria-live="polite"></div>
   <div id="stats-container" class="stats-container" aria-live="polite" aria-atomic="true"></div>
@@ -160,6 +186,8 @@
 <script>
   import { normalizeJson, getAvailableKeys, getAutoMapping } from "../utils/normalizer";
   import { parseFileContent } from "../utils/loaders";
+  import { compactIndexes, inflateIndexes, migrateV1, isV2Envelope } from "../utils/exportCodec";
+  import { compressJsonToBlob, decompressBlobToText, hasCompressionSupport } from "../utils/compress";
   import { get, set } from "idb-keyval";
   let indexes = [];
   let currentFilteredGames = [];
@@ -169,6 +197,30 @@
   let undoTimer = null;
   let activeFilter = "all";
   let sortBy = "relevance";
+  // Vista de resultados: "list" (defecto) o "grid". Persiste en localStorage.
+  let resultsView = "list";
+  try { if (localStorage.getItem("indexly_results_view") === "grid") resultsView = "grid"; } catch {}
+  // Gradiente determinista por título — mismo hash que las covers del Hub
+  function hueFromTitle(s) {
+    let h = 0;
+    const str = String(s || "x");
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 360;
+    return h;
+  }
+  function coverGradientStyle(title) {
+    const h = hueFromTitle(title);
+    const h2 = (h + 45) % 360;
+    return `linear-gradient(120deg, hsl(${h} 65% 32%) 0%, hsl(${h2} 70% 22%) 100%)`;
+  }
+  function applyResultsView() {
+    resultsContainer.classList.toggle("view-grid", resultsView === "grid");
+    document.querySelectorAll(".view-btn").forEach((b) => {
+      const on = b.dataset.view === resultsView;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    try { localStorage.setItem("indexly_results_view", resultsView); } catch {}
+  }
   const fileInput = document.getElementById("json-input");
   const importInput = document.getElementById("import-input");
   const exportBtn = document.getElementById("export-btn");
@@ -343,10 +395,12 @@
     let addedCount = 0; let duplicateNames = [];
     for (const file of files) {
       try {
-        const text = await file.text();
+        // decompressBlobToText es superconjunto de file.text(): los .gz se
+        // descomprimen y el resto pasa tal cual (permite arrastrar .json.gz del Hub)
+        const text = await decompressBlobToText(file);
         const rawData = parseFileContent(text, file.name);
         const parsedGames = normalizeJson(rawData, file.name, null);
-        const baseName = file.name.replace(/\.[^.]+$/i, "");
+        const baseName = file.name.replace(/\.json\.gz$/i, "").replace(/\.gz$/i, "").replace(/\.[^.]+$/i, "");
         const indexName = (rawData && typeof rawData === "object" && !Array.isArray(rawData) && rawData.name) ? rawData.name : baseName;
         const exists = indexes.some((idx) => idx.name.toLowerCase() === indexName.toLowerCase());
         if (exists) { duplicateNames.push(indexName); continue; }
@@ -379,9 +433,9 @@
   ["dragenter","dragover"].forEach(ev => dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); }));
   ["dragleave","drop"].forEach(ev => dropZone.addEventListener(ev, (e) => { e.preventDefault(); if (ev==="dragleave" && e.target!==dropZone) return; dropZone.classList.remove("drag-over"); }));
   dropZone.addEventListener("drop", async (e) => {
-    const allowed = [".json",".csv",".tsv",".yaml",".yml",".xml",".txt"];
+    const allowed = [".json",".json.gz",".gz",".csv",".tsv",".yaml",".yml",".xml",".txt"];
     const files = Array.from(e.dataTransfer.files || []).filter(f => allowed.some(ext=>f.name.toLowerCase().endsWith(ext)));
-    if (files.length === 0) { showToast("Arrastra archivos .json/.csv/.yaml/.xml/.txt", "warning"); return; }
+    if (files.length === 0) { showToast("Arrastra archivos .json/.json.gz/.csv/.yaml/.xml/.txt", "warning"); return; }
     await handleFiles(files);
   });
   // Paste archivos
@@ -448,18 +502,39 @@
     exportList.querySelectorAll('input[type="checkbox"]').forEach(c=>c.checked=v);
     updateExportUI();
   });
-  exportConfirm.addEventListener("click", ()=>{
+  exportConfirm.addEventListener("click", async ()=>{
     const ids = new Set(getSelectedIds(exportList));
     if (ids.size===0) return;
-    const data = indexes.filter(idx=>ids.has(idx.id)).map(idx=>({ id: idx.id, name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping }));
-    const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `indexly-backup-${new Date().toISOString().slice(0,10)}.json`;
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-    closeExportModal();
-    showToast(`${data.length} fuente(s) exportadas`, "success");
+    const selected = indexes.filter(idx=>ids.has(idx.id));
+    exportConfirm.disabled = true;
+    exportConfirm.textContent = "Comprimiendo…";
+    try {
+      const compact = compactIndexes(selected.map(idx=>({ name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping })));
+      const json = JSON.stringify(compact);
+      let blob, ext, type;
+      if (hasCompressionSupport()) {
+        blob = await compressJsonToBlob(json);
+        ext = "json.gz"; type = "application/gzip";
+      } else {
+        blob = new Blob([json], {type:"application/json"});
+        ext = "json"; type = "application/json";
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `indexly-backup-${new Date().toISOString().slice(0,10)}.${ext}`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      closeExportModal();
+      const prettySize = JSON.stringify(selected.map(idx=>({ id: idx.id, name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping }), null, 2)).length;
+      const savedPct = prettySize ? Math.round((1 - blob.size / prettySize)*100) : 0;
+      showToast(`${selected.length} fuente(s) exportadas · ${savedPct}% más pequeño`, "success");
+    } catch(err){
+      console.error(err);
+      showToast(`Error al exportar: ${err.message}`, "error");
+    } finally {
+      exportConfirm.disabled = false;
+      updateExportUI();
+    }
   });
   exportModal.addEventListener("click", (e)=>{ if(e.target===exportModal) closeExportModal(); });
   exportBtn.addEventListener("click", openExportModal);
@@ -528,9 +603,16 @@
     e.target.value = "";
     if (!file) return;
     try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      if (!Array.isArray(data)) throw new Error("Backup debe ser un array");
+      const text = await decompressBlobToText(file);
+      const parsed = JSON.parse(text);
+      let data;
+      if (isV2Envelope(parsed)) {
+        data = inflateIndexes(parsed);
+      } else if (Array.isArray(parsed)) {
+        data = migrateV1(parsed);
+      } else {
+        throw new Error("Backup debe ser un array o envelope v2");
+      }
       openImportSelectModal(data);
     } catch(err){ showToast(`Error en backup: ${err.message}`, "error"); }
   });
@@ -695,27 +777,38 @@
     updateQuotaInfo();
   }
   function renderIndexesManager() {
+    const countEl = document.getElementById("fuentes-count");
+    const summaryEl = document.getElementById("bulk-summary");
     if (indexes.length === 0) {
-      indexesListContainer.innerHTML = `<div class="empty-state"><div class="empty-icon">◇</div><p class="no-indexes">Sin fuentes aún<br><span>Sube uno o varios archivos para empezar</span></p></div>`;
+      if (countEl) countEl.textContent = "";
+      indexesListContainer.innerHTML = `<div class="empty-state"><div class="empty-icon">◇</div><p class="no-indexes">Sin fuentes aún<br><span>Sube uno o varios archivos para empezar</span></p><label for="json-input" class="empty-cta"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Añadir tu primer archivo</label></div>`;
       bulkActions.style.display = "none";
       return;
     }
+    const totalGames = indexes.reduce((a, i) => a + (i.games ? i.games.length : 0), 0);
+    const activeCount = indexes.filter((i) => i.active).length;
+    if (countEl) countEl.textContent = `${indexes.length}`;
+    if (summaryEl) summaryEl.textContent = `${indexes.length} ${indexes.length === 1 ? "fuente" : "fuentes"} · ${totalGames.toLocaleString("es-ES")} elementos · ${activeCount === 1 ? "1 activa" : `${activeCount} activas`}`;
     bulkActions.style.display = "flex";
-    indexesListContainer.innerHTML = indexes.map((index) => `
+    indexesListContainer.innerHTML = indexes.map((index) => {
+      const coverBg = coverGradientStyle(index.name);
+      const initial = (String(index.name || "?").trim().charAt(0) || "?").toUpperCase();
+      return `
       <div class="index-pill ${index.active ? "active" : "inactive"}">
         <div class="index-pill-info">
-          <span class="status-dot" aria-hidden="true"></span>
+          <span class="index-avatar" style="background:${coverBg}" aria-hidden="true">${escapeHtml(initial)}</span>
           <div class="index-text">
             <strong>${escapeHtml(index.name)}</strong>
-            <small>${index.games.length.toLocaleString("es-ES")} elementos${index.mapping ? " · mapeado" : ""}</small>
+            <small>${index.games.length.toLocaleString("es-ES")} elementos${index.mapping ? ' <span class="mapped-badge">mapeado</span>' : ""}${index.active ? "" : " · desactivada"}</small>
           </div>
         </div>
         <div class="index-pill-actions">
-          <button type="button" class="action-btn map" onclick="openMappingModal('${index.id}')" title="Ajustar mapeo" aria-label="Ajustar ${escapeHtml(index.name)}">⚙</button>
-          <button type="button" class="action-btn toggle" onclick="toggleIndex('${index.id}')">${index.active ? "Desactivar" : "Activar"}</button>
-          <button type="button" class="action-btn delete" onclick="removeIndex('${index.id}')" aria-label="Eliminar ${escapeHtml(index.name)}">✕</button>
+          <button type="button" class="action-btn map" onclick="openMappingModal('${index.id}')" title="Ajustar mapeo" aria-label="Ajustar ${escapeHtml(index.name)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+          <button type="button" class="index-switch" role="switch" aria-checked="${index.active ? "true" : "false"}" aria-label="${index.active ? "Desactivar" : "Activar"} ${escapeHtml(index.name)}" title="${index.active ? "Desactivar" : "Activar"}" onclick="toggleIndex('${index.id}')"><span class="knob" aria-hidden="true"></span></button>
+          <button type="button" class="action-btn delete" onclick="removeIndex('${index.id}')" title="Eliminar" aria-label="Eliminar ${escapeHtml(index.name)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
         </div>
-      </div>`).join("");
+      </div>`;
+    }).join("");
   }
 
   function renderMetaBadges(meta) {
@@ -748,7 +841,9 @@
     }
     statsContainer.innerHTML = `Mostrando <strong>${Math.min(visibleCount, totalMatches).toLocaleString("es-ES")}</strong> de <strong>${totalMatches.toLocaleString("es-ES")}</strong>`;
     const gamesToRender = currentFilteredGames.slice(0, visibleCount);
-    resultsContainer.innerHTML = gamesToRender.map((game) => {
+    resultsContainer.innerHTML = resultsView === "grid"
+      ? gamesToRender.map(renderGridCard).join("")
+      : gamesToRender.map((game) => {
       const metaHtml = renderMetaBadges(game.meta);
       const subtitleHtml = game.subtitle ? `<p class="game-subtitle">${escapeHtml(game.subtitle)}</p>` : "";
       const hasMeta = metaHtml || game.fileSize && game.fileSize !== "Tamaño desconocido";
@@ -764,17 +859,69 @@
     }).join("");
     loadMoreBtn.style.display = visibleCount < totalMatches ? "inline-flex" : "none";
   }
+  // Card de cuadrícula — espejo de las pkg-card del Hub con metadatos IndexLy:
+  // cover determinista + inicial, título, subtítulo, fuente + ≤2 badges, pie con
+  // tamaño/fecha y botón Abrir siempre visible (sin depender de hover).
+  function renderGridCard(game) {
+    const title = String(game.title || "Sin título");
+    const initial = (title.trim().charAt(0) || "?").toUpperCase();
+    const pill = game.fileSize && game.fileSize !== "Tamaño desconocido" ? game.fileSize : game.source || "";
+    const subtitleHtml = game.subtitle ? `<p class="grid-subtitle">${escapeHtml(game.subtitle)}</p>` : "";
+    let badges = `<span class="source-badge">${escapeHtml(game.source)}</span>`;
+    if (game.meta && typeof game.meta === "object") {
+      const entries = Object.entries(game.meta).slice(0, 2);
+      badges += entries.map(([k, v]) => {
+        const text = `${k}: ${v}`;
+        return `<span class="meta-badge" title="${escapeHtml(`${k}: ${v}`)}">${escapeHtml(text.length > 28 ? text.slice(0, 27) + "…" : text)}</span>`;
+      }).join("");
+    }
+    let dateVal = "";
+    try {
+      if (game.meta && typeof game.meta === "object") {
+        for (const [k, v] of Object.entries(game.meta)) {
+          if (["uploaddate", "upload_date", "fechasubida", "fecha"].includes(String(k).toLowerCase())) { dateVal = formatDateDDMMYY(String(v)); break; }
+        }
+      }
+      if (!dateVal && game.uploadDate) dateVal = formatDateDDMMYY(String(game.uploadDate));
+    } catch {}
+    const action = game.link
+      ? `<a href="${escapeHtml(game.link)}" target="_blank" rel="noopener" class="grid-open">Abrir <span aria-hidden="true">↗</span></a>`
+      : `<span class="grid-no-link">Sin enlace</span>`;
+    return `
+      <div class="grid-card" tabindex="0">
+        <div class="grid-cover" style="background:${coverGradientStyle(title)}" aria-hidden="true">
+          <span class="grid-cover__initial">${escapeHtml(initial)}</span>
+          ${pill ? `<span class="grid-cover__pill">${escapeHtml(String(pill))}</span>` : ""}
+        </div>
+        <div class="grid-body">
+          <h3 class="grid-title">${escapeHtml(title)}</h3>
+          ${subtitleHtml}
+          <div class="grid-badges">${badges}</div>
+        </div>
+        <div class="grid-foot">
+          ${dateVal ? `<span class="grid-foot__stat">${escapeHtml(dateVal)}</span>` : ""}
+          ${action}
+        </div>
+      </div>`;
+  }
   searchInput.addEventListener("input", () => renderSearch());
   loadMoreBtn.addEventListener("click", () => { visibleCount += 50; renderCurrentView(); });
   // Sort & filter
   const sortSelect = document.getElementById("sort-select");
   const quotaInfo = document.getElementById("quota-info");
   sortSelect.addEventListener("change", (e) => { sortBy = e.target.value; renderSearch(); });
-  document.querySelectorAll(".chip").forEach(btn=> btn.addEventListener("click", () => {
-    document.querySelectorAll(".chip").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll(".filter-chips .chip").forEach(btn=> btn.addEventListener("click", () => {
+    document.querySelectorAll(".filter-chips .chip").forEach(b=>b.classList.remove("active"));
     btn.classList.add("active");
     activeFilter = btn.dataset.filter;
     renderSearch();
+  }));
+  // Toggle vista lista/cuadrícula (persiste en localStorage)
+  document.querySelectorAll(".view-btn").forEach(btn=> btn.addEventListener("click", () => {
+    if (resultsView === btn.dataset.view) return;
+    resultsView = btn.dataset.view;
+    applyResultsView();
+    renderCurrentView();
   }));
   async function updateQuotaInfo() {
     try {
@@ -811,7 +958,111 @@
       e.preventDefault(); searchInput.focus();
     }
   });
-  loadStoredIndexes();
+  // Importación desde IndexlyHub (?import=<url-archivo>&name=<slug>&mapping=<json>)
+  // Descarga el .json.gz del Hub y abre el MENÚ DE IMPORTACIÓN EXISTENTE
+  // (openImportSelectModal): flujo 100% normal — duplicados, conteo, confirmación.
+  // Todo client-side: nada sale de este navegador salvo el GET al archivo.
+  const HUB_MAX_BYTES = 10 * 1024 * 1024;
+  function isAllowedHubUrl(u) {
+    if (u.protocol !== "https:" && u.hostname !== "localhost" && u.hostname !== "127.0.0.1") return false;
+    if (u.hostname === "localhost" || u.hostname === "127.0.0.1") return true;
+    return u.origin === "https://files.indexlyhub.daida.net";
+  }
+  function cleanHubParams() {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("import");
+      url.searchParams.delete("name");
+      url.searchParams.delete("mapping");
+      history.replaceState(null, "", url);
+    } catch {}
+  }
+  function hubFileLabel(rawData, fallback) {
+    if (rawData && typeof rawData === "object" && !Array.isArray(rawData) && typeof rawData.name === "string" && rawData.name.trim()) {
+      return rawData.name.trim().slice(0, 100);
+    }
+    return fallback;
+  }
+  async function handleHubImport() {
+    let rawParam = null;
+    try { rawParam = new URL(window.location.href).searchParams.get("import"); } catch { return; }
+    if (!rawParam) return;
+    const params = new URL(window.location.href).searchParams;
+    // Formato antiguo (el Hub ya no lo emite): no se rompe en silencio
+    if (!rawParam.startsWith("http")) {
+      cleanHubParams();
+      showToast("Enlace antiguo no soportado: ábrelo de nuevo desde el Hub", "warning", 5000);
+      return;
+    }
+    let fileUrl;
+    try {
+      fileUrl = new URL(rawParam);
+    } catch {
+      cleanHubParams();
+      showToast("Enlace de importación inválido", "error");
+      return;
+    }
+    if (!isAllowedHubUrl(fileUrl)) {
+      cleanHubParams();
+      showToast("Origen de importación no permitido", "error");
+      return;
+    }
+    const slugHint = (params.get("name") || "").trim().slice(0, 100);
+    let mappingHint = null;
+    try {
+      const m = params.get("mapping");
+      if (m) {
+        const parsed = JSON.parse(m);
+        if (parsed && typeof parsed === "object" && typeof parsed.titleKey === "string") mappingHint = parsed;
+      }
+    } catch {}
+    showToast("Descargando paquete del Hub…", "info", 4000);
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 30000);
+      let headOk = true;
+      try {
+        const head = await fetch(fileUrl.toString(), { method: "HEAD", signal: ctrl.signal });
+        const len = Number(head.headers.get("content-length") || "0");
+        if (len > HUB_MAX_BYTES) { clearTimeout(timer); throw new Error(`Archivo demasiado grande (${(len/1024/1024).toFixed(1)}MB > 10MB)`); }
+      } catch (e) {
+        if (e.name === "AbortError") throw e;
+        headOk = false; // algunos orígenes no soportan HEAD: se valida con el tamaño real
+      }
+      const resp = await fetch(fileUrl.toString(), { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error(`Descarga falló (${resp.status})`);
+      const blob = await resp.blob();
+      if (blob.size > HUB_MAX_BYTES) throw new Error(`Archivo demasiado grande (${(blob.size/1024/1024).toFixed(1)}MB > 10MB)`);
+      if (!headOk && blob.size === 0) throw new Error("Archivo vacío");
+      const text = await decompressBlobToText(blob);
+      const parsed = JSON.parse(text);
+      // Importación PURA (igual que "Restaurar backup"): si es un envelope v2 o
+      // un backup v1, se reconstruyen sus fuentes originales con mappings.
+      // Solo el dato suelto entra como una fuente (vía "añadir archivo").
+      let items;
+      if (isV2Envelope(parsed)) {
+        items = inflateIndexes(parsed);
+      } else if (Array.isArray(parsed) && parsed.length > 0 && parsed.every((it) => it && typeof it === "object" && !Array.isArray(it) && "rawData" in it)) {
+        items = migrateV1(parsed);
+      } else {
+        const name = hubFileLabel(parsed, slugHint || fileUrl.pathname.split("/").pop().replace(/\.json\.gz$/i, "").replace(/\.gz$/i, "") || "Hub");
+        items = [{ name, rawData: parsed, mapping: mappingHint, active: true }];
+      }
+      cleanHubParams();
+      openImportSelectModal(items);
+    } catch (err) {
+      console.error(err);
+      cleanHubParams();
+      const msg = err && err.name === "AbortError" ? "Descarga agotó el tiempo (30s)" : (err.message || "Error al descargar");
+      showToast(`${msg}`, "error", 7000, {
+        label: "Abrir archivo",
+        onClick: async () => { window.open(fileUrl.toString(), "_blank", "noopener"); },
+      });
+    }
+  }
+  applyResultsView();
+  loadStoredIndexes().then(() => handleHubImport()).catch(() => handleHubImport());
 </script>
 
 <style>
@@ -824,11 +1075,21 @@
     gap: 0;
   }
   .index-manager-card {
-    background: var(--color-surface);
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(255,255,255,0.025), transparent 120px), var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-xl);
     padding: var(--space-8);
     transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .index-manager-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 24px; right: 24px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(14,165,233,0.45), transparent);
+    pointer-events: none;
   }
   .index-manager-card.drag-over { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); }
   .manager-header {
@@ -843,11 +1104,12 @@
   }
   .manager-title { display: flex; align-items: center; gap: var(--space-3); }
   .manager-icon {
-    width: 32px; height: 32px;
+    width: 34px; height: 34px;
     display: grid; place-items: center;
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, rgba(14,165,233,0.16), rgba(14,165,233,0.04));
+    border: 1px solid var(--color-primary-border);
+    border-radius: 11px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.2), 0 4px 14px rgba(14,165,233,0.08);
   }
   .manager-header h3 {
     margin: 0;
@@ -863,7 +1125,25 @@
     font-weight: var(--weight-light);
     color: var(--color-text-secondary);
   }
+  .fuentes-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    margin-left: 6px;
+    vertical-align: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    color: var(--color-text-secondary);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+  }
+  .fuentes-count:empty { display: none; }
   .manager-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .manager-actions .action-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; }
   .manager-actions .action-btn.secondary { color: var(--color-text-secondary); }
   .collapse-btn { width: 26px; height: 26px; display: grid; place-items: center; background: transparent; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-text-tertiary); cursor: pointer; flex-shrink: 0; }
   .collapse-btn:hover { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-border-strong); }
@@ -887,74 +1167,159 @@
     cursor: pointer;
     user-select: none;
     border: 1px solid transparent;
-    transition: opacity 0.15s ease;
+    transition: opacity 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
   }
-  .file-label:hover { opacity: 0.86; }
+  .file-label:hover { opacity: 0.88; box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-  .bulk-actions { display: flex; gap: var(--space-2); margin-top: var(--space-4); flex-wrap: wrap; }
-  .bulk-btn { background: transparent; border: 1px solid var(--color-border); color: var(--color-text-secondary); padding: 6px 12px; border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: 500; cursor: pointer; }
-  .bulk-btn:hover { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-border-strong); }
-  .bulk-btn.danger:hover { background: rgba(239,68,68,0.08); color: #f87171; border-color: rgba(239,68,68,0.15); }
-  .drop-hint { margin: var(--space-3) 0 0; text-align: center; font-size: var(--text-xs); color: var(--color-text-tertiary); }
-  .controls { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 18px; padding: 4px; background: #0a0f1c; border: 1px solid #1a2332; border-radius: 999px; flex-wrap: wrap; }
-  .filter-chips { display: flex; gap: 2px; padding: 2px; background: #070a12; border: 1px solid #1e293b; border-radius: 999px; }
-  .chip { background: transparent; border: none; color: #64748b; padding: 6px 13px; border-radius: 999px; font-size: 11px; font-weight: 500; letter-spacing: 0.01em; cursor: pointer; transition: background 0.15s, color 0.15s; }
+  .bulk-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-3); padding: 6px 6px 6px 12px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 999px; flex-wrap: wrap; }
+  .bulk-summary { font-size: 11px; color: var(--color-text-tertiary); font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bulk-sep { display: none; }
+  .bulk-tools { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .bulk-seg { display: flex; gap: 2px; padding: 2px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 999px; }
+  .bulk-seg-btn { background: transparent; border: none; color: var(--color-text-secondary); padding: 5px 11px; border-radius: 999px; font-size: 11px; font-weight: 500; cursor: pointer; transition: background 0.15s, color 0.15s; white-space: nowrap; }
+  .bulk-seg-btn:hover { background: var(--color-surface-raised); color: var(--color-text); }
+  .bulk-seg-btn:focus-visible { outline: 1px solid var(--color-primary); outline-offset: 2px; }
+  .bulk-clear { background: transparent; border: none; color: var(--color-text-tertiary); font-size: 11px; font-weight: 500; cursor: pointer; padding: 5px 8px; border-radius: 999px; transition: color 0.15s, background 0.15s; white-space: nowrap; }
+  .bulk-clear:hover { color: #f87171; background: rgba(239,68,68,0.08); }
+  .bulk-clear:focus-visible { outline: 1px solid #f87171; outline-offset: 2px; }
+  .drop-hint {
+    margin: var(--space-4) 0 0;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px;
+    font-size: var(--text-xs); color: var(--color-text-tertiary);
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    background: rgba(255,255,255,0.012);
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  }
+  .index-manager-card.drag-over .drop-hint { border-color: var(--color-primary-border); color: var(--color-primary); background: var(--color-primary-soft); }
+  .drop-hint svg { flex-shrink: 0; }
+  .drop-hint kbd {
+    font-family: var(--font-mono); font-size: 10px; color: var(--color-text-secondary);
+    background: var(--color-bg); border: 1px solid var(--color-border); border-bottom-width: 2px;
+    border-radius: 6px; padding: 1px 6px;
+  }
+  .controls { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 18px; padding: 6px 10px; background: #0a0f1c; border: 1px solid #1a2332; border-radius: 999px; flex-wrap: wrap; }
+  .controls-sep { width: 1px; align-self: stretch; background: #1e293b; margin: 6px 0; flex-shrink: 0; }
+  .filter-chips { display: flex; gap: 2px; padding: 0; background: transparent; border: none; }
+  .chip { background: transparent; border: none; color: #64748b; padding: 7px 13px; border-radius: 999px; font-size: 11px; font-weight: 500; letter-spacing: 0.01em; cursor: pointer; transition: background 0.15s, color 0.15s; min-height: 30px; }
   .chip.active { background: #fff; color: #0f172a; box-shadow: 0 1px 6px rgba(0,0,0,0.15); }
   .chip:not(.active):hover { color: #cbd5e1; }
-  .sort-select { background: #070a12; border: 1px solid #1e293b; color: #94a3b8; padding: 7px 28px 7px 12px; border-radius: 999px; font-size: 11px; font-weight: 500; letter-spacing: 0.01em; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2364748b' stroke-width='1.3' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+  /* Toggle vista lista/cuadrícula — mismo lenguaje que .filter-chips */
+  .chip:not(.active):hover { color: #cbd5e1; background: rgba(255,255,255,0.04); }
+  .chip:focus-visible { outline: 1px solid var(--color-primary); outline-offset: 2px; }
+  .view-toggle { display: flex; gap: 2px; padding: 0; background: transparent; border: none; }
+  .chip.view-btn { display: inline-flex; align-items: center; gap: 6px; }
+  .chip.view-btn svg { flex-shrink: 0; }
+  .sort-select { background-color: transparent; border: none; color: #94a3b8; padding: 7px 26px 7px 10px; border-radius: 999px; font-size: 11px; font-weight: 500; letter-spacing: 0.01em; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2364748b' stroke-width='1.3' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; min-height: 30px; }
+  .sort-select:hover { color: #e2e8f0; background-color: rgba(255,255,255,0.04); }
+  .sort-select:focus { outline: none; box-shadow: 0 0 0 3px rgba(14,165,233,0.08); }
+  .sort-select option { background: #0f141e; color: #e2e8f0; }
   .sort-select:focus { outline: none; border-color: #24344f; box-shadow: 0 0 0 3px rgba(14,165,233,0.08); }
   .sort-select:hover { border-color: #24344f; color: #cbd5e1; }
   .quota-info { font-size: var(--text-xs); color: var(--color-text-tertiary); min-height: 14px; margin-top: var(--space-2); text-align: right; }
   .indexes-grid-list { display: flex; flex-direction: column; gap: var(--space-2); min-height: 36px; }
-  .empty-state {
+  /* Estado vacío (inyectado por JS → :global, si no Astro no aplica los estilos) */
+  :global(.empty-state) {
     display: flex; flex-direction: column; align-items: center;
     gap: var(--space-3);
-    padding: var(--space-6) var(--space-4) var(--space-2);
+    padding: var(--space-8) var(--space-4) var(--space-6);
     text-align: center;
-  }
-  .empty-icon {
-    width: 28px; height: 28px;
-    display: grid; place-items: center;
     border: 1px dashed var(--color-border);
-    border-radius: var(--radius-sm);
-    color: var(--color-text-tertiary);
-    font-size: 13px;
+    border-radius: var(--radius-lg);
+    background: rgba(255,255,255,0.012);
   }
+  :global(.empty-icon) {
+    width: 40px; height: 40px;
+    display: grid; place-items: center;
+    border: 1px dashed var(--color-border-strong);
+    border-radius: 12px;
+    color: var(--color-text-secondary);
+    font-size: 16px;
+    background: var(--color-bg);
+  }
+  :global(.empty-cta) {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--color-text); color: var(--color-bg);
+    padding: 10px 18px; border-radius: 999px;
+    font-size: var(--text-sm); font-weight: var(--weight-medium);
+    cursor: pointer; user-select: none; border: 1px solid transparent;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    transition: opacity 0.15s ease, box-shadow 0.15s ease;
+    margin-top: var(--space-1);
+  }
+  :global(.empty-cta:hover) { opacity: 0.88; box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+  :global(.empty-cta svg) { flex-shrink: 0; }
   :global(.index-pill) {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-md);
+    padding: 10px 10px 10px 12px;
+    border-radius: 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: var(--space-3);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
   }
-  :global(.index-pill:hover) { border-color: var(--color-border-hover); box-shadow: var(--shadow-subtle); }
-  :global(.index-pill.active) { background: var(--color-surface-hover); border-color: var(--color-border-hover); }
-  :global(.index-pill.inactive) { opacity: 0.5; border-style: dashed; }
-  :global(.index-pill-info) { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
-  :global(.status-dot) { width: 7px; height: 7px; border-radius: 50%; background: var(--color-text-tertiary); flex-shrink: 0; }
-  :global(.index-pill.active .status-dot) { background: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); }
-  :global(.index-text) { display: flex; flex-direction: column; min-width: 0; }
+  :global(.index-pill:hover) { border-color: var(--color-border-hover); box-shadow: var(--shadow-subtle); transform: translateY(-1px); }
+  :global(.index-pill.active) {
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent 60%), var(--color-surface-hover);
+    border-color: var(--color-border-hover);
+  }
+  :global(.index-pill.inactive) { opacity: 0.55; }
+  :global(.index-pill-info) { display: flex; align-items: center; gap: var(--space-3); min-width: 0; flex: 1; }
+  :global(.index-avatar) {
+    width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center;
+    font-size: 17px; font-weight: 700; flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.16);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.35);
+    text-shadow: 0 1px 6px rgba(0,0,0,0.4);
+  }
+  :global(.index-pill.inactive .index-avatar) { filter: grayscale(0.7) brightness(0.85); box-shadow: none; }
+  :global(.index-text) { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
   :global(.index-text strong) {
-    font-size: var(--text-md); font-weight: var(--weight-medium); letter-spacing: var(--tracking-tight); color: var(--color-text);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 24ch;
+    font-size: var(--text-md); font-weight: 600; letter-spacing: var(--tracking-tight); color: var(--color-text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 26ch; line-height: 1.25;
   }
-  :global(.index-text small) { font-size: var(--text-xs); color: var(--color-text-secondary); }
-  :global(.index-pill-actions) { display: flex; align-items: center; gap: var(--space-2); }
+  :global(.index-text small) { font-size: var(--text-xs); color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
+  :global(.mapped-badge) {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.02em; color: var(--color-primary);
+    background: var(--color-primary-soft); border: 1px solid var(--color-primary-border);
+    padding: 1px 7px; border-radius: 999px; flex-shrink: 0;
+  }
+  :global(.index-pill-actions) { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+  :global(.index-pill .index-pill-actions .action-btn) { opacity: 0; }
+  :global(.index-pill:hover .index-pill-actions .action-btn),
+  :global(.index-pill:focus-within .index-pill-actions .action-btn) { opacity: 1; }
+  @media (hover: none) {
+    :global(.index-pill .index-pill-actions .action-btn) { opacity: 1; }
+  }
   :global(.action-btn) {
     border: 1px solid var(--color-border); background: transparent; padding: 6px 10px; border-radius: var(--radius-full);
     font-size: var(--text-xs); font-weight: var(--weight-medium); cursor: pointer; transition: all 0.15s ease; line-height: 1;
   }
-  :global(.action-btn.toggle) { color: var(--color-text-secondary); }
-  :global(.action-btn.toggle:hover) { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-border-strong); }
-  :global(.index-pill.active .action-btn.toggle) { background: var(--color-primary-soft); color: var(--color-primary); border-color: var(--color-primary-border); }
-  :global(.action-btn.delete) { color: var(--color-text-tertiary); padding: 6px 8px; border-color: transparent; }
+  :global(.action-btn.delete) { color: var(--color-text-tertiary); padding: 7px; border-color: transparent; display: grid; place-items: center; border-radius: 10px; }
   :global(.action-btn.delete:hover) { background: rgba(239,68,68,0.08); color: #f87171; border-color: rgba(239,68,68,0.15); }
-  :global(.action-btn.map) { color: var(--color-text-tertiary); padding: 6px 8px; border-color: transparent; }
+  :global(.action-btn.map) { color: var(--color-text-tertiary); padding: 7px; border-color: transparent; display: grid; place-items: center; border-radius: 10px; }
   :global(.action-btn.map:hover) { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-border); }
+  @media (hover: none) {
+    :global(.action-btn.delete), :global(.action-btn.map) { border-color: var(--color-border); }
+  }
+  /* Switch activar/desactivar */
+  :global(.index-switch) {
+    width: 38px; height: 22px; border-radius: 999px; padding: 0; flex-shrink: 0;
+    background: #141b29; border: 1px solid var(--color-border); cursor: pointer; position: relative;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  :global(.index-switch .knob) {
+    position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+    background: #64748b; transition: left 0.15s ease, background 0.15s ease;
+  }
+  :global(.index-switch:hover) { border-color: var(--color-border-strong); }
+  :global(.index-switch:focus-visible) { outline: 1px solid var(--color-primary); outline-offset: 2px; }
+  :global(.index-switch[aria-checked="true"]) { background: rgba(14,165,233,0.22); border-color: var(--color-primary-border); }
+  :global(.index-switch[aria-checked="true"] .knob) { left: 18px; background: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); }
   :global(.no-indexes) { font-size: var(--text-sm); color: var(--color-text-tertiary); margin: 0; text-align: center; }
   :global(.no-indexes span) { color: var(--color-text-secondary); font-weight: var(--weight-light); }
   .search-wrap { position: relative; margin-top: var(--space-8); }
@@ -978,6 +1343,53 @@
   .stats-container { margin-top: var(--space-4); font-size: var(--text-sm); font-weight: var(--weight-light); color: var(--color-text-secondary); min-height: 16px; }
   .stats-container strong { font-weight: var(--weight-medium); color: var(--color-text); }
   .results-grid { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+  /* Vista cuadrícula — espejo de las pkg-card del Hub, adaptada a metadatos IndexLy */
+  :global(.results-grid.view-grid) { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-3); }
+  :global(.grid-card) {
+    display: flex; flex-direction: column; background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl); overflow: hidden; color: inherit;
+    transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+    content-visibility: auto; contain-intrinsic-size: 0 300px; min-width: 0;
+  }
+  :global(.grid-card:hover) { transform: translateY(-3px); border-color: var(--color-primary-border); box-shadow: 0 12px 32px rgba(0,0,0,0.3), 0 0 0 1px var(--color-primary-border); }
+  :global(.grid-card:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  :global(.grid-cover) { position: relative; height: 72px; overflow: hidden; flex-shrink: 0; }
+  :global(.grid-cover::after) {
+    content: ""; position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,0.16) 1px, transparent 1px); background-size: 14px 14px;
+    mask-image: linear-gradient(180deg, black, transparent 90%); -webkit-mask-image: linear-gradient(180deg, black, transparent 90%);
+  }
+  :global(.grid-cover__initial) {
+    position: absolute; left: 12px; bottom: -16px; width: 44px; height: 44px; border-radius: 12px;
+    display: grid; place-items: center; font-size: 18px; font-weight: 700; color: #fff;
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.28);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); z-index: 1; text-shadow: 0 1px 8px rgba(0,0,0,0.4);
+  }
+  :global(.grid-cover__pill) {
+    position: absolute; right: 10px; top: 10px; display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10.5px; font-weight: 600; font-family: var(--font-mono); color: #fff;
+    background: rgba(0,0,0,0.42); border: 1px solid rgba(255,255,255,0.18); padding: 4px 8px; border-radius: 999px;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); z-index: 1;
+    max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  :global(.grid-body) { display: flex; flex-direction: column; gap: 6px; padding: 22px 14px 12px; flex: 1; min-width: 0; }
+  :global(.grid-title) {
+    margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.3; color: var(--color-text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  :global(.grid-subtitle) { margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  :global(.grid-badges) { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  :global(.grid-foot) {
+    display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--color-text-tertiary);
+    border-top: 1px solid var(--color-border); padding: 10px 14px 12px; margin-top: auto;
+  }
+  :global(.grid-foot__stat) { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  :global(.grid-open) {
+    margin-left: auto; background: var(--color-text); color: var(--color-bg); padding: 7px 13px; border-radius: var(--radius-full);
+    text-decoration: none; font-size: 11.5px; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; border: 1px solid transparent;
+  }
+  :global(.grid-open:hover) { opacity: 0.88; }
+  :global(.grid-no-link) { margin-left: auto; font-size: 10.5px; color: var(--color-text-tertiary); border: 1px dashed var(--color-border); padding: 6px 10px; border-radius: var(--radius-full); flex-shrink: 0; }
   :global(.game-card) {
     background: var(--color-surface); border: 1px solid var(--color-border); padding: var(--space-4); border-radius: var(--radius-lg);
     display: flex; justify-content: space-between; align-items: center; gap: var(--space-4);
@@ -1025,6 +1437,12 @@
     .index-manager-card { padding: var(--space-6); }
     :global(.game-card) { flex-direction: column; align-items: stretch; }
     :global(.magnet-link), :global(.no-magnet) { width: 100%; justify-content: center; }
+    .controls { border-radius: 16px; padding: 8px; gap: 6px; }
+    .controls-sep { display: none; }
+    .filter-chips { order: 1; width: 100%; }
+    .filter-chips .chip { flex: 1; justify-content: center; }
+    .sort-select { order: 2; flex: 1; }
+    .view-toggle { order: 3; }
   }
   /* Toasts — minimal, static (no animation) */
   :global(.toast-container) { position: fixed; bottom: 18px; right: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 100; pointer-events: none; }
