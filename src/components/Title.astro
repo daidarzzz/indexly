@@ -7,6 +7,14 @@
       <span class="logo-text">Index<span>Ly</span></span>
     </a>
     <div class="nav-actions">
+      <a id="hub-upload-link" href="https://indexlyhub.daida.net/upload" target="_blank" rel="noopener" class="nav-link" style="display:none">
+        Subir
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M7 17L17 7"/><path d="M8.5 7.5H17V16"/></svg>
+      </a>
+      <button type="button" id="hub-connect-btn" class="nav-link hub-connect" title="Conectar tu API de IndexlyHub">
+        <span class="hub-dot" id="hub-dot" aria-hidden="true"></span>
+        <span id="hub-connect-label">Conectar Hub</span>
+      </button>
       <a href="https://github.com/daidarzzz/indexly" target="_blank" rel="noopener" class="nav-link">
         GitHub
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M7 17L17 7"/><path d="M8.5 7.5H17V16"/></svg>
@@ -87,7 +95,7 @@
     border-radius: var(--radius-full);
   }
 
-  .nav-actions { display: flex; align-items: center; }
+  .nav-actions { display: flex; align-items: center; gap: 4px; }
 
   .nav-link {
     display: inline-flex;
@@ -107,6 +115,24 @@
     background: var(--color-surface);
     border-color: var(--color-border);
   }
+  .hub-connect {
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .hub-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--color-text-tertiary);
+    flex-shrink: 0;
+  }
+  .hub-connect.connected .hub-dot {
+    background: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-soft);
+  }
+  .hub-connect.connected { color: var(--color-text); }
 
   /* — Hero — aire generoso (64/32) — */
   .hero {
