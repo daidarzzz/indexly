@@ -64,6 +64,9 @@
         </div>
       </div>
       <div class="manager-actions">
+        <button type="button" id="hub-collapse" class="collapse-btn" aria-expanded="true" aria-controls="hub-offline hub-online" aria-label="Comprimir IndexlyHub" title="Comprimir">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
         <button type="button" id="hub-card-btn" class="action-btn secondary">Conectar</button>
       </div>
     </div>
@@ -400,7 +403,7 @@
     return (...args) => { clearTimeout(t); t = setTimeout(()=>fn(...args), delay); };
   }
 
-  function escapeHtml(str) { const d = document.createElement("div"); d.textContent = str == null ? "" : String(str); return d.innerHTML; }
+  function escapeHtml(str) { const d = document.createElement("div"); d.textContent = str == null ? "" : String(str); return d.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
   function formatDateDDMMYY(val) {
     if (!val || typeof val !== "string") return val;
     const s = val.trim();
@@ -1138,6 +1141,8 @@
   const hubTokenInput = document.getElementById("hub-token");
   const hubSaveBtn = document.getElementById("hub-save");
   const hubDisconnectBtn = document.getElementById("hub-disconnect");
+  const hubCollapseBtn = document.getElementById("hub-collapse");
+  const hubCard = document.getElementById("hub-card");
   const footerNote = document.getElementById("footer-note");
   const FOOTER_DEFAULT = "Todo se guarda localmente. Nada se envía a servidores.";
   const FOOTER_HUB = "Tus archivos siguen en local. Explorar e importar usa la API de IndexlyHub.";
@@ -1152,16 +1157,12 @@
   const hubCache = new Map();
   const hubSeen = new Map();
 
-  function hubTokenPrefix() {
-    if (!hubToken) return "";
-    return hubToken.length > 11 ? hubToken.slice(0, 11) + "…" : hubToken;
-  }
   function updateHubUI() {
     const on = !!hubToken;
-    if (hubConnectLabel) hubConnectLabel.textContent = on ? ("Hub · " + hubTokenPrefix()) : "Conectar Hub";
+    if (hubConnectLabel) hubConnectLabel.textContent = on ? "Hub" : "Conectar Hub";
     if (hubConnectBtn) {
       hubConnectBtn.classList.toggle("connected", on);
-      hubConnectBtn.title = on ? ("Conectado (" + hubTokenPrefix() + ") — clic para desconectar") : "Conectar tu API de IndexlyHub";
+      hubConnectBtn.title = on ? "Conectado — clic para desconectar" : "Conectar tu API de IndexlyHub";
     }
     if (hubUploadLink) hubUploadLink.style.display = on ? "" : "none";
     if (hubCardBtn) hubCardBtn.textContent = on ? "Cambiar" : "Conectar";
@@ -1197,7 +1198,7 @@
   hubModal.addEventListener("click", (e) => { if (e.target === hubModal) closeHubModal(); });
   function hubToggleConnect() {
     if (hubToken) {
-      showConfirm(`¿Desconectar del Hub (${hubTokenPrefix()})?`, () => { hubDisconnect(false); closeHubModal(); });
+      showConfirm("¿Desconectar del Hub?", () => { hubDisconnect(false); closeHubModal(); });
     } else {
       openHubModal();
     }
@@ -1207,6 +1208,22 @@
   if (hubDisconnectBtn) hubDisconnectBtn.addEventListener("click", () => { hubDisconnect(false); closeHubModal(); });
   if (hubTokenInput) hubTokenInput.addEventListener("keydown", (e) => { if (e.key === "Enter") hubSaveBtn.click(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && hubModal.style.display !== "none") closeHubModal(); });
+
+  let hubCollapsed = localStorage.getItem("indexly_hub_collapsed") === "1";
+  function applyHubCollapsed(v) {
+    hubCollapsed = v;
+    hubCard.classList.toggle("collapsed", v);
+    if (hubCollapseBtn) {
+      hubCollapseBtn.setAttribute("aria-expanded", String(!v));
+      hubCollapseBtn.setAttribute("aria-label", v ? "Expandir IndexlyHub" : "Comprimir IndexlyHub");
+      hubCollapseBtn.title = v ? "Expandir" : "Comprimir";
+    }
+    localStorage.setItem("indexly_hub_collapsed", v ? "1" : "0");
+  }
+  if (hubCollapseBtn) {
+    applyHubCollapsed(hubCollapsed);
+    hubCollapseBtn.addEventListener("click", () => applyHubCollapsed(!hubCard.classList.contains("collapsed")));
+  }
 
   async function hubVerifyToken(token) {
     const ctrl = new AbortController();
@@ -1734,6 +1751,8 @@
   :global(.pkg-group.collapsed .pkg-children) { display: none; }
   /* IndexlyHub — tarjeta con el mismo lenguaje que Fuentes */
   .hub-card { margin-top: var(--space-4); }
+  .hub-card.collapsed #hub-offline,
+  .hub-card.collapsed #hub-online { display: none; }
   .hub-status {
     font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
     color: var(--color-text-tertiary); background: var(--color-bg); border: 1px solid var(--color-border);
@@ -1750,6 +1769,9 @@
   .hub-list { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
   :global(.hub-item) { cursor: default; }
   :global(.hub-item .io-item-meta) { gap: 4px; }
+  :global(.hub-item .action-btn.secondary) { display: inline-flex; align-items: center; justify-content: center; min-height: 26px; white-space: nowrap; color: var(--color-text-secondary); }
+  :global(.hub-item .action-btn.secondary:hover) { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-border-strong); }
+  :global(.hub-item .action-btn.map) { min-height: 26px; padding: 6px; }
   :global(.hub-star.on) { color: var(--color-primary); border-color: var(--color-primary-border); background: var(--color-primary-soft); }
   .hub-loading, .hub-empty { font-size: var(--text-sm); color: var(--color-text-tertiary); text-align: center; margin: var(--space-4) 0 var(--space-2); }
   .hub-error { font-size: var(--text-sm); color: #f87171; text-align: center; margin: var(--space-4) 0 var(--space-2); }
