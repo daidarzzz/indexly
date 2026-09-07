@@ -91,6 +91,7 @@ export function createPluginRuntime(host) {
   const indexFlags = [];
   const sourceActions = [];
   const searchFilters = [];
+  const docSections = [];
   const listeners = [];
   const registeredIds = new Set();
 
@@ -206,6 +207,22 @@ export function createPluginRuntime(host) {
       addSearchFilter(fn) {
         if (typeof fn === "function") searchFilters.push({ pluginId: plugin.id, fn });
       },
+      // Sección en la documentación de usuario (/ayuda) (v2). En la página principal
+      // el slot se registra pero nadie lo consume (no-op); la página de ayuda usa un
+      // runtime de stubs y consume docSections tras activar los plugins.
+      // html tiene prioridad sobre render(container).
+      addDocSection(cfg) {
+        if (!cfg || !cfg.id || !cfg.title) return;
+        if (typeof cfg.html !== "string" && typeof cfg.render !== "function") return;
+        docSections.push({
+          pluginId: plugin.id,
+          pluginName: plugin.name,
+          id: String(cfg.id),
+          title: String(cfg.title).slice(0, 120),
+          html: typeof cfg.html === "string" ? cfg.html : "",
+          render: typeof cfg.render === "function" ? cfg.render : null,
+        });
+      },
       // ---- persistencia namespaced por plugin ----
       storage: {
         async get(key) {
@@ -260,5 +277,5 @@ export function createPluginRuntime(host) {
     }
   }
 
-  return { activateAll, emit, chips, cardActions, sections, footers, indexFlags, sourceActions, searchFilters, registeredIds };
+  return { activateAll, emit, chips, cardActions, sections, footers, indexFlags, sourceActions, searchFilters, docSections, registeredIds };
 }

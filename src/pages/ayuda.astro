@@ -1,0 +1,297 @@
+---
+// src/pages/ayuda.astro — Documentación de usuario de IndexLy (ruta /ayuda).
+// Contenido estático en español + sección dinámica que rellenan los plugins
+// instalados vía ctx.addDocSection (runtime de stubs sobre el mismo motor).
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Ayuda — IndexLy" description="Guía de uso de IndexLy: añade fuentes, busca, organiza y amplía la app con plugins. 100% local.">
+  <div class="DocPage">
+    <aside class="DocSidebar">
+      <a class="DocBrand" href="/">
+        <span class="DocBrand-mark" aria-hidden="true">IL</span>
+        <span class="DocBrand-text">IndexLy<small>Ayuda</small></span>
+      </a>
+      <nav class="DocToc" aria-label="Índice de la ayuda">
+        <a href="#empezar">1. Empezar</a>
+        <a href="#buscar">2. Buscar y organizar</a>
+        <a href="#ajustar">3. Ajustar fuentes</a>
+        <a href="#hub">4. IndexlyHub</a>
+        <a href="#backup">5. Copia de seguridad</a>
+        <a href="#plugins">6. Plugins</a>
+        <a href="#privacidad">7. Privacidad</a>
+        <a href="#faq">8. Preguntas frecuentes</a>
+        <a href="#plugin-docs" id="toc-plugin-docs" style="display:none">9. Documentación de plugins</a>
+      </nav>
+      <div class="DocSidebar-foot">
+        <a href="/" class="DocBack">← Volver a IndexLy</a>
+      </div>
+    </aside>
+
+    <main class="DocMain">
+      <header class="DocHero">
+        <h1>Ayuda de IndexLy</h1>
+        <p>Gestor local de índices: carga tus archivos de juegos, libros, pelis o lo que uses,
+        combina fuentes y busca en todo a la vez. <strong>Todo se queda en tu navegador</strong> —
+        sin cuentas, sin servidores, sin telemetría.</p>
+      </header>
+
+      <section id="empezar" class="DocSection">
+        <h2><span>1</span> Empezar</h2>
+        <p>En la tarjeta <strong>Fuentes</strong> pulsa <em>Añadir archivo</em> y elige uno o varios
+        archivos. También puedes <strong>arrastrarlos</strong> a la tarjeta o pegar datos con
+        <kbd>Ctrl</kbd>+<kbd>V</kbd> (JSON, CSV, TSV, YAML, XML o texto plano).</p>
+        <p>Cada archivo se convierte en una <strong>fuente</strong>: una lista de elementos con
+        título, subtítulo y enlace. Todas las fuentes activas se buscan juntas, como una sola
+        biblioteca.</p>
+        <p class="DocTip">Sin fuentes aún, el buscador está deshabilitado. Sube tu primer archivo y se activa solo.</p>
+      </section>
+
+      <section id="buscar" class="DocSection">
+        <h2><span>2</span> Buscar y organizar</h2>
+        <ul class="DocList">
+          <li><strong>Buscador</strong>: busca en todas las fuentes activas a la vez. Ignora
+          acentos y mayúsculas. También escribe en la URL (<code>?q=…</code>) para compartir la búsqueda.</li>
+          <li><strong>Filtros</strong>: «Con enlace» / «Sin enlace», más los que añadan tus plugins.</li>
+          <li><strong>Orden</strong>: relevancia, título A-Z/Z-A, tamaño o fecha.</li>
+          <li><strong>Vistas</strong>: lista o cuadrícula. Si tienes el plugin <em>Vistas+</em>,
+          el menú se amplía con Compacta, Tabla y Pósters.</li>
+          <li><strong>Activar/desactivar fuentes</strong>: el interruptor de cada fuente decide si
+          participa en la búsqueda. Con muchas fuentes, agrúpalas por paquetes del Hub.</li>
+        </ul>
+      </section>
+
+      <section id="ajustar" class="DocSection">
+        <h2><span>3</span> Ajustar fuentes</h2>
+        <p>El icono de ajustes de cada fuente abre el <strong>mapeo</strong>: renómbrala y elige
+        qué campo de tu archivo es el <em>título</em>, el <em>subtítulo</em> y el <em>enlace</em>.
+        La vista previa te dice cuántos elementos se reconocerán.</p>
+        <p>Volver a subir un archivo con el mismo nombre abre un <strong>comparador</strong>:
+        verás qué elementos se añaden, se quitan o cambian antes de aplicar nada.</p>
+        <p>Si tienes plugins que marcan fuentes (por ejemplo «Es un índice de streaming»), esas
+        casillas aparecen también en este modal.</p>
+      </section>
+
+      <section id="hub" class="DocSection">
+        <h2><span>4</span> IndexlyHub</h2>
+        <p><strong>IndexlyHub</strong> es el hub comunitario para compartir paquetes de índices.
+        Conéctalo con un token <code>ih_…</code> (crea el tuyo en
+        <a href="https://indexlyhub.daida.net/profile" target="_blank" rel="noopener">indexlyhub.daida.net/profile</a>)
+        para explorar paquetes populares, recientes, tus favoritos y buscar.</p>
+        <p>Al importar, las fuentes se agrupan en un <strong>paquete</strong> que puedes activar o
+        eliminar en bloque. También hay una pestaña de <strong>Plugins</strong> para instalar
+        extensiones directamente.</p>
+        <p class="DocTip">Explorar el Hub requiere token; instalar plugins desde la pestaña Plugins no.</p>
+      </section>
+
+      <section id="backup" class="DocSection">
+        <h2><span>5</span> Copia de seguridad</h2>
+        <p><strong>Exportar</strong> guarda tus fuentes seleccionadas en un único archivo
+        (opcionalmente comprimido <code>.gz</code>). <strong>Importar</strong> lo restaura
+        eligiendo qué fuentes quieres traer de vuelta. Ideal para cambiar de navegador o equipo.</p>
+        <p class="DocTip">Los plugins con datos propios (como GameVault) exportan desde sus Ajustes.</p>
+      </section>
+
+      <section id="plugins" class="DocSection">
+        <h2><span>6</span> Plugins</h2>
+        <p>Los plugins amplían IndexLy: secciones nuevas (como Streaming o GameVault), filtros,
+        botones, estadísticas… Se instalan desde la tarjeta <strong>Plugins</strong>:</p>
+        <ul class="DocList">
+          <li><strong>Fichero</strong>: un <code>.js</code> de tu equipo.</li>
+          <li><strong>URL</strong>: enlaza un <code>.js</code> publicado en cualquier sitio.</li>
+          <li><strong>Hub</strong>: pestaña «Plugins» de IndexlyHub, con versión y autor.</li>
+        </ul>
+        <p>Al instalar verás el nombre, la versión y los <strong>permisos</strong> declarados.
+        Los permisos son informativos salvo <code>data:write</code>: sin él, un plugin no puede
+        modificar ni eliminar tus fuentes (y aun así, cualquier eliminación pide confirmación).</p>
+        <p>Cada plugin puede añadir <strong>pestañas junto al buscador</strong> (la primera,
+        «Buscador», siempre es IndexLy). Puedes desactivar o eliminar plugins cuando quieras;
+        desactivar recarga la página.</p>
+        <p class="DocTip">¿Quieres crear uno? Mira la
+        <a href="/plugins/README.md" target="_blank" rel="noopener">guía para desarrolladores</a>
+        y los ejemplos en <code>/plugins/</code>.</p>
+      </section>
+
+      <section id="privacidad" class="DocSection">
+        <h2><span>7</span> Privacidad</h2>
+        <p><strong>Todo es local.</strong> Tus fuentes, tus plugins y sus datos viven en el
+        almacenamiento de tu navegador (IndexedDB). No hay cuentas ni telemetría. IndexLy solo
+        toca la red cuando tú se lo pides: explorar el Hub, importar de él, o un plugin que
+        consulte su servicio (p. ej. GameDB para GameVault).</p>
+      </section>
+
+      <section id="faq" class="DocSection">
+        <h2><span>8</span> Preguntas frecuentes</h2>
+        <dl class="DocFaq">
+          <dt>¿Funciona sin conexión?</dt>
+          <dd>Sí. Solo necesitas red para el Hub o para plugins que consulten APIs externas.</dd>
+          <dt>¿Dónde están mis datos?</dt>
+          <dd>En el almacenamiento de este navegador. Usa Exportar para llevarlos a otro sitio;
+          cambiar de navegador o limpiar datos borra la biblioteca.</dd>
+          <dt>¿Por qué un plugin pide <code>data:write</code>?</dt>
+          <dd>Porque quiere poder modificar o eliminar fuentes. Tú confirmas cada eliminación y
+          siempre puedes deshacerla.</dd>
+          <dt>Un plugin falla, ¿qué hago?</dt>
+          <dd>La tarjeta Plugins mostrará el error. Puedes desactivarlo o eliminarlo y reinstalar
+          una versión nueva; el resto de la app no se ve afectada.</dd>
+        </dl>
+      </section>
+
+      <section id="plugin-docs" class="DocSection" style="display:none">
+        <h2><span>9</span> Documentación de plugins</h2>
+        <p class="DocMuted">Guías aportadas por los plugins que tienes instalados.</p>
+        <div id="plugin-docs-list" class="DocPluginList"></div>
+      </section>
+    </main>
+  </div>
+</Layout>
+
+<script>
+  // Documentación dinámica: activa los plugins habilitados con un host de stubs y
+  // consume sus ctx.addDocSection(...). En esta página ningún otro slot tiene efecto.
+  import { getStoredPlugins, createPluginRuntime } from "../utils/plugins";
+
+  const docsHost = {
+    showToast: () => {},
+    modal: () => {},
+    getIndexes: () => [],
+    getAllGames: () => [],
+    getFilteredGames: () => [],
+    getQuery: () => "",
+    addSource: async () => null,
+    sourcesGet: () => null,
+    sourcesUpdate: async () => { throw new Error("No disponible en la documentación"); },
+    sourcesRemove: async () => false,
+    normalize: () => [],
+    refreshApp: () => {},
+    escapeHtml: (s) => { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;"); },
+    debounce: (fn) => fn,
+  };
+
+  (async () => {
+    const runtime = createPluginRuntime(docsHost);
+    const stored = await runtime.activateAll();
+    const list = document.getElementById("plugin-docs-list");
+    const section = document.getElementById("plugin-docs");
+    const tocLink = document.getElementById("toc-plugin-docs");
+    if (!list || !section) return;
+    const secs = runtime.docSections;
+    if (!secs.length) return; // sin plugins que documenten: la sección no aparece
+    section.style.display = "";
+    if (tocLink) tocLink.style.display = "";
+    secs.forEach((s) => {
+      const wrap = document.createElement("article");
+      wrap.className = "DocPluginSection";
+      wrap.id = "doc-" + s.pluginId;
+      const h3 = document.createElement("h3");
+      h3.textContent = s.title;
+      wrap.appendChild(h3);
+      const body = document.createElement("div");
+      body.className = "DocPluginBody";
+      if (s.html) body.innerHTML = s.html;
+      else if (s.render) { try { s.render(body); } catch (err) { console.error("[IndexLy] docSection:", err); } }
+      wrap.appendChild(body);
+      const credit = document.createElement("small");
+      credit.textContent = "Aportado por el plugin " + s.pluginName;
+      wrap.appendChild(credit);
+      list.appendChild(wrap);
+      const toc = document.getElementById("toc-plugin-docs");
+      if (toc) {
+        const a = document.createElement("a");
+        a.href = "#doc-" + s.pluginId;
+        a.textContent = s.pluginName;
+        a.className = "DocToc-sub";
+        toc.parentNode.insertBefore(a, toc.nextSibling);
+      }
+    });
+    void stored;
+  })().catch((err) => console.error("[IndexLy] docs:", err));
+</script>
+
+<style>
+  .DocPage {
+    display: flex;
+    gap: var(--space-8);
+    max-width: 1020px;
+    margin: 0 auto;
+    padding: var(--space-8) var(--space-6) var(--space-16);
+    align-items: flex-start;
+  }
+  .DocSidebar {
+    position: sticky;
+    top: var(--space-8);
+    width: 210px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .DocBrand { display: flex; align-items: center; gap: 10px; text-decoration: none; margin-bottom: var(--space-2); }
+  .DocBrand-mark {
+    width: 34px; height: 34px; display: grid; place-items: center;
+    background: var(--color-text); color: var(--color-bg);
+    border-radius: 10px; font-weight: 700; font-size: 13px; letter-spacing: -0.02em;
+  }
+  .DocBrand-text { display: flex; flex-direction: column; font-weight: 600; font-size: 14px; color: var(--color-text); line-height: 1.2; }
+  .DocBrand-text small { font-size: 11px; font-weight: 400; color: var(--color-text-tertiary); }
+  .DocToc { display: flex; flex-direction: column; gap: 2px; border-left: 1px solid var(--color-border); padding-left: var(--space-3); }
+  .DocToc a {
+    font-size: 12.5px; color: var(--color-text-secondary); text-decoration: none;
+    padding: 5px 8px; border-radius: 8px; transition: background 0.15s, color 0.15s;
+  }
+  .DocToc a:hover { background: var(--color-surface-hover); color: var(--color-text); }
+  .DocToc a.DocToc-sub { color: var(--color-text-tertiary); padding-left: 18px; font-size: 12px; }
+  .DocSidebar-foot { margin-top: var(--space-2); padding-left: var(--space-3); }
+  .DocBack { font-size: 12px; color: var(--color-text-tertiary); text-decoration: none; }
+  .DocBack:hover { color: var(--color-text); }
+
+  .DocMain { flex: 1; min-width: 0; }
+  .DocHero h1 { margin: 0 0 8px; font-size: var(--text-2xl); font-weight: 700; letter-spacing: var(--tracking-tighter); }
+  .DocHero p { margin: 0; color: var(--color-text-secondary); max-width: 62ch; line-height: 1.7; }
+  .DocSection { margin-top: var(--space-12); }
+  .DocSection h2 {
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 0 var(--space-4); font-size: 19px; font-weight: 700; letter-spacing: var(--tracking-tight);
+  }
+  .DocSection h2 span {
+    width: 26px; height: 26px; display: grid; place-items: center; flex-shrink: 0;
+    background: var(--color-surface-raised); border: 1px solid var(--color-border);
+    border-radius: 8px; font-size: 11px; font-weight: 600; color: var(--color-text-secondary);
+  }
+  .DocSection p, .DocSection dd, .DocSection dt { max-width: 66ch; }
+  .DocSection p { margin: 0 0 var(--space-3); color: var(--color-text-secondary); }
+  .DocSection strong { color: var(--color-text); }
+  .DocSection code {
+    font-family: var(--font-mono); font-size: 11.5px; color: #7dd3fc;
+    background: #070a12; border: 1px solid var(--color-border); border-radius: 6px; padding: 1px 6px;
+  }
+  .DocSection a { color: #7dd3fc; }
+  .DocList { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; color: var(--color-text-secondary); max-width: 66ch; }
+  .DocList li strong { color: var(--color-text); }
+  .DocTip {
+    background: rgba(14,165,233,0.06); border: 1px solid var(--color-primary-border);
+    border-radius: 10px; padding: 10px 14px; font-size: 12.5px;
+  }
+  .DocTip:has(strong) { color: var(--color-text-secondary); }
+  .DocFaq { margin: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+  .DocFaq dt { font-weight: 600; color: var(--color-text); font-size: 13.5px; }
+  .DocFaq dd { margin: 4px 0 0; color: var(--color-text-secondary); font-size: 13px; }
+  .DocMuted { color: var(--color-text-tertiary); font-size: 12.5px; }
+  .DocPluginList { display: flex; flex-direction: column; gap: var(--space-4); }
+  .DocPluginSection {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); padding: var(--space-5);
+  }
+  .DocPluginSection h3 { margin: 0 0 var(--space-3); font-size: 15px; font-weight: 600; color: var(--color-text); }
+  .DocPluginSection small { display: block; margin-top: var(--space-4); color: var(--color-text-tertiary); font-size: 11px; }
+  .DocPluginBody { color: var(--color-text-secondary); font-size: 13px; }
+  .DocPluginBody p { margin: 0 0 var(--space-3); }
+  .DocPluginBody ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+  .DocPluginBody strong { color: var(--color-text); }
+  .DocPluginBody code { font-family: var(--font-mono); font-size: 11.5px; color: #7dd3fc; }
+  @media (max-width: 760px) {
+    .DocPage { flex-direction: column; gap: var(--space-6); }
+    .DocSidebar { position: static; width: 100%; }
+    .DocToc { flex-direction: row; flex-wrap: wrap; border-left: none; padding-left: 0; gap: 4px; }
+    .DocToc a { background: var(--color-surface); border: 1px solid var(--color-border); }
+  }
+</style>

@@ -100,6 +100,7 @@ Los errores dentro de un listener no rompen IndexLy (se loguean).
 | `ctx.addSearchFilter(fn)` **v2** | `fn(games[]) → games[]` aplicado antes del matching |
 | `ctx.addFooter(html)` | Bloque bajo los resultados |
 | `ctx.addIndexFlag({id, label, hint?})` | Checkbox "por fuente" en el modal de mapeo (se persiste en `index.flags`) |
+| `ctx.addDocSection({id, title, html? \| render?(container)})` **v2** | Tu propia sección en la página de ayuda (`/ayuda`), dentro de «Documentación de plugins» |
 
 ### UI y utilidades
 
@@ -161,3 +162,28 @@ IndexLy.register({
 
 Recetas completas: mira `streaming.js` (secciones + player), `gamevault.js` (vault con
 persistencia y red), `vistas.js` (UI declarativa con CSS sobre el render nativo).
+
+### Receta: documenta tu plugin
+
+Tu plugin puede tener su propia sección en la página de ayuda (`/ayuda`), dentro de
+«Documentación de plugins». Llámalo desde `setup`, siempre sin condiciones (en la página
+principal es un no-op):
+
+```js
+IndexLy.register({
+  setup(ctx) {
+    ctx.addDocSection?.({
+      id: "mi-plugin-doc",
+      title: "Mi plugin — para qué sirve",
+      html: "<p>Explica aquí <strong>cómo se usa</strong>: qué añade, dónde aparece, " +
+            "si necesita configuración y qué servicios externos consulta.</p>",
+      // alternativa para contenido vivo:
+      // render: (container) => { container.append(...) }
+    });
+  }
+});
+```
+
+El HTML es responsabilidad del plugin (escapa tú cualquier dato dinámico con
+`ctx.escapeHtml`). Mantén la guía centrada en el usuario final: qué puede hacer y dónde,
+no cómo está implementado. `gamevault.js` tiene un ejemplo completo.
