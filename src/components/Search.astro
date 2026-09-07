@@ -111,6 +111,7 @@
     </div>
     <div id="plugins-list" class="plugins-list" aria-live="polite"></div>
   </div>
+  <div id="plugin-tabbar" class="plugin-tabbar" role="group" aria-label="Secciones de plugins" style="display:none"></div>
   <div class="search-wrap">
     <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
     <input type="text" id="search-input" placeholder="Buscar…" disabled autocomplete="off" spellcheck="false" aria-label="Buscar en índices" />
@@ -144,7 +145,6 @@
       </button>
     </div>
   </div>
-  <div id="plugin-tabbar" class="plugin-tabbar" role="group" aria-label="Secciones de plugins" style="display:none"></div>
   <div id="quota-info" class="quota-info" aria-live="polite"></div>
   <div id="plugin-sections" class="plugin-sections" aria-live="polite"></div>
   <div id="stats-container" class="stats-container" aria-live="polite" aria-atomic="true"></div>
@@ -1138,6 +1138,7 @@
     renderIndexesManager();
     renderSearch();
     updateQuotaInfo();
+    renderPluginTabbar(); // navbar siempre al día (firma: no toca DOM si no cambió)
     if (activePluginSection) applyPluginSection();
     pluginRuntime.emit("state:change", {});
   }
@@ -2017,21 +2018,28 @@
     }
   }
 
-  // Secciones (pestañas) de plugins
+  // Secciones (pestañas) de plugins — el navbar vive encima del buscador.
+  // La primera pestaña es SIEMPRE el Buscador de IndexLy (vista normal); las demás
+  // son secciones registradas por plugins (Streaming, GameVault…).
   let lastTabbarSig = ""; // evita re-render del navbar si no cambió (sin trompicones)
   function renderPluginTabbar() {
     const secs = pluginRuntime.sections;
+    if (searchRoot) searchRoot.classList.toggle("has-plugin-tabs", secs.length > 0);
+    if (!secs.length) { lastTabbarSig = ""; pluginTabbar.style.display = "none"; pluginTabbar.innerHTML = ""; return; }
     const sig = secs.map(s => s.id + ":" + s.label).join("|") + "#" + (activePluginSection || "");
     if (sig === lastTabbarSig) return;
     lastTabbarSig = sig;
-    if (!secs.length) { pluginTabbar.style.display = "none"; pluginTabbar.innerHTML = ""; return; }
     pluginTabbar.style.display = "flex";
-    pluginTabbar.innerHTML = secs.map(s =>
-      `<button type="button" class="plx-tab${activePluginSection === s.id ? " active" : ""}" aria-pressed="${activePluginSection === s.id}" onclick="pluginShowSection('${escapeHtml(s.id)}')">${escapeHtml(s.label)}</button>`
-    ).join("");
+    const searchOn = !activePluginSection;
+    pluginTabbar.innerHTML =
+      `<button type="button" class="plx-tab${searchOn ? " active" : ""}" aria-pressed="${searchOn}" onclick="pluginShowSection('__search__')">Buscador</button>` +
+      secs.map(s =>
+        `<button type="button" class="plx-tab${activePluginSection === s.id ? " active" : ""}" aria-pressed="${activePluginSection === s.id}" onclick="pluginShowSection('${escapeHtml(s.id)}')">${escapeHtml(s.label)}</button>`
+      ).join("");
   }
   window.pluginShowSection = function(id) {
-    activePluginSection = activePluginSection === id ? null : id;
+    // "__search__" = volver al buscador de IndexLy (pestaña fija)
+    activePluginSection = (id === "__search__" || activePluginSection === id) ? null : id;
     applyPluginSection();
   };
   // Abre una sección de plugin por id (la usan los propios plugins, ej. "▶ Ver" del Streaming)
@@ -2624,6 +2632,8 @@
   :global(.no-indexes) { font-size: var(--text-sm); color: var(--color-text-tertiary); margin: 0; text-align: center; }
   :global(.no-indexes span) { color: var(--color-text-secondary); font-weight: var(--weight-light); }
   .search-wrap { position: relative; margin-top: var(--space-8); }
+  /* Con navbar de plugins visible, el buscador se pega justo debajo de las pestañas */
+  .Search.has-plugin-tabs .search-wrap { margin-top: 10px; }
   .search-icon { position: absolute; left: var(--space-4); top: 50%; transform: translateY(-50%); pointer-events: none; }
   .search-hint {
     position: absolute; right: var(--space-3); top: 50%; transform: translateY(-50%);
@@ -2868,18 +2878,18 @@
   .plugins-card.collapsed #plugins-list { display: none; }
   .plugins-card.collapsed .manager-header { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
   .plugins-list { display: flex; flex-direction: column; gap: var(--space-2); min-height: 36px; }
-  /* Plugins — navbar de secciones: pestañas minimalistas sobre una hairline.
-     Margen estable en ambos estados (búsqueda / sección abierta) para que nada salte. */
+  /* Plugins — navbar de secciones: pestañas minimalistas sobre una hairline,
+     siempre pegado justo encima del buscador. La primera pestaña (Buscador) es fija. */
   #plugin-tabbar {
     align-items: flex-end;
     border-bottom: 1px solid var(--color-border);
     display: none;
-    margin: var(--space-4) 0 0;
+    margin: 14px 0 0;
     overflow-x: auto;
     scrollbar-width: none;
   }
   #plugin-tabbar::-webkit-scrollbar { display: none; }
-  .Search.section-open #plugin-tabbar { margin: var(--space-4) 0 12px; }
+  .Search.section-open #plugin-tabbar { margin: 14px 0 12px; }
   .plugin-chips { display: contents; }
   .plugin-add-pane { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .plugin-url-input { flex: 1 1 200px; min-width: 0; text-transform: none; letter-spacing: 0; }
