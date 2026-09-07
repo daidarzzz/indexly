@@ -2262,7 +2262,31 @@
       const res = await fetch(fileUrl.toString(), { signal: ctrl.signal });
       if (!res.ok) throw new Error(`Descarga falló (HTTP ${res.status})`);
       const code = await res.text();
-      const meta = validatePluginSource(code);
+      // El Hub sirve plugins como manifiesto JSON {plugin:{…}} (r2_url del paquete);
+      // una URL directa a un .js también es válida. Detectamos cuál es.
+      let meta = null;
+      let pluginCode = code;
+      try {
+        const parsed = JSON.parse(code);
+        const pl = parsed && typeof parsed === "object" ? parsed.plugin : null;
+        if (pl && typeof pl === "object" && pl.id && typeof pl.code === "string") {
+          if (!pl.code.trim()) throw new Error("Manifiesto sin código");
+          if (pluginCodeBytes(pl.code) > MAX_PLUGIN_BYTES) throw new Error(`El código supera ${Math.round(MAX_PLUGIN_BYTES / 1024)} KB`);
+          try { compilePlugin(pl.code); } catch (err) { throw new Error("El código del plugin tiene errores de sintaxis: " + err.message); }
+          meta = {
+            id: String(pl.id),
+            name: String(pl.name || pl.id).slice(0, 60),
+            version: String(pl.version || "1.0.0").slice(0, 20),
+            permissions: Array.isArray(pl.permissions) ? pl.permissions.map(String) : [],
+            description: pl.description ? String(pl.description).slice(0, 200) : "",
+          };
+          pluginCode = pl.code;
+        }
+      } catch (err) {
+        if (err instanceof SyntaxError) { /* no era JSON: seguimos como .js crudo */ }
+        else throw err;
+      }
+      if (!meta) meta = validatePluginSource(code);
       window.openPluginAddModal();
       pluginAddSourceTab("url");
       pluginUrlInput.value = fileUrl.toString();
@@ -2270,7 +2294,7 @@
       if (installedPlugins.some(p => p.id === meta.id)) {
         showPluginAddError(`Ya existe un plugin con el id "${meta.id}". Elimínalo primero para reinstalar.`);
       } else {
-        showPluginPreview(code, meta);
+        showPluginPreview(pluginCode, meta);
       }
     } catch (err) {
       showToast(err.name === "AbortError" ? "La descarga agotó el tiempo" : `No se pudo descargar el plugin: ${err.message}`, "error", 5000);
