@@ -187,6 +187,7 @@
       <label class="mapping-label" for="map-link">Enlace (opcional)
         <select id="map-link"></select>
       </label>
+      <div id="map-flags" class="map-flags"></div>
     </div>
     <p class="mapping-hint">Vista previa: <span id="mapping-preview">—</span></p>
     <div class="mapping-actions">
@@ -644,7 +645,7 @@
       if (saved) {
         indexes = saved.map((item) => {
           const parsedGames = normalizeJson(item.rawData, item.name, item.mapping || null);
-          return { id: item.id, name: item.name, active: item.active, rawData: item.rawData, mapping: item.mapping || null, pkg: item.pkg || null, games: parsedGames, updatedAt: item.updatedAt || null };
+          return { id: item.id, name: item.name, active: item.active, rawData: item.rawData, mapping: item.mapping || null, pkg: item.pkg || null, flags: item.flags || null, games: parsedGames, updatedAt: item.updatedAt || null };
         });
         if (indexes.length > 0) searchInput.removeAttribute("disabled");
       }
@@ -655,7 +656,7 @@
   }
   async function saveIndexesToStorage() {
     try {
-      const dataToSave = indexes.map((idx) => ({ id: idx.id, name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping || null, pkg: idx.pkg || null, updatedAt: idx.updatedAt || null }));
+      const dataToSave = indexes.map((idx) => ({ id: idx.id, name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping || null, pkg: idx.pkg || null, flags: idx.flags || null, updatedAt: idx.updatedAt || null }));
       await set("indexly_saved_indexes", dataToSave);
     } catch (e) { console.error(e); showToast("Error al guardar en IndexedDB", "error"); }
   }
@@ -1029,11 +1030,47 @@
     fillSelect(mapTitleSelect, keys, current.titleKey || auto.titleKey || keys[0], false);
     fillSelect(mapSubtitleSelect, keys, current.subtitleKey || auto.subtitleKey || "", true);
     fillSelect(mapLinkSelect, keys, current.linkKey || auto.linkKey || "", true);
+    renderMappingFlags(idx);
     updateMappingPreview();
     mappingModal.style.display = "flex";
     mappingModal.setAttribute("aria-hidden", "false");
     setTimeout(() => mapNameInput.focus(), 50);
   };
+  // Checkboxes de flags registradas por plugins (ej. "es de streaming" del plugin Streaming)
+  function renderMappingFlags(idx) {
+    const wrap = document.getElementById("map-flags");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    const flags = pluginRuntime.indexFlags;
+    if (!flags.length) { wrap.style.display = "none"; return; }
+    wrap.style.display = "flex";
+    for (const f of flags) {
+      const label = document.createElement("label");
+      label.className = "plx-flag-label";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.dataset.plxflag = f.id;
+      cb.checked = !!(idx.flags && idx.flags[f.id]);
+      label.appendChild(cb);
+      const txt = document.createElement("span");
+      txt.textContent = f.label;
+      label.appendChild(txt);
+      if (f.hint) {
+        const hint = document.createElement("small");
+        hint.textContent = f.hint;
+        label.appendChild(hint);
+      }
+      wrap.appendChild(label);
+    }
+  }
+  function readMappingFlags(idx) {
+    const wrap = document.getElementById("map-flags");
+    const cbs = wrap ? wrap.querySelectorAll("input[data-plxflag]") : [];
+    if (!cbs.length) return;
+    const flags = Object.assign({}, idx.flags || {});
+    cbs.forEach(cb => { flags[cb.dataset.plxflag] = cb.checked; });
+    idx.flags = flags;
+  }
   window.closeMappingModal = function() {
     mappingModal.style.display = "none";
     mappingModal.setAttribute("aria-hidden", "true");
@@ -1051,6 +1088,7 @@
     const mapping = { titleKey, subtitleKey: mapSubtitleSelect.value || null, linkKey: mapLinkSelect.value || null };
     idx.name = newName;
     idx.mapping = mapping;
+    readMappingFlags(idx);
     idx.games = normalizeJson(idx.rawData, idx.name, mapping);
     await saveIndexesToStorage();
     closeMappingModal();
@@ -1855,8 +1893,9 @@
       if (indexes.some(i => i.name.toLowerCase() === name.toLowerCase())) throw new Error(`Ya existe una fuente "${name}"`);
       const m = input.mapping || null;
       const mapping = (m && m.titleKey) ? { titleKey: String(m.titleKey), subtitleKey: m.subtitleKey ? String(m.subtitleKey) : null, linkKey: m.linkKey ? String(m.linkKey) : null } : null;
+      const flags = (input.flags && typeof input.flags === "object") ? input.flags : null;
       const games = normalizeJson(input.rawData, name, mapping);
-      const idx = { id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name, active: input.active !== false, rawData: input.rawData, mapping, pkg: null, games, updatedAt: Date.now() };
+      const idx = { id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name, active: input.active !== false, rawData: input.rawData, mapping, pkg: null, flags, games, updatedAt: Date.now() };
       indexes.push(idx);
       searchInput.removeAttribute("disabled");
       await saveIndexesToStorage(); updateApp();
@@ -1990,6 +2029,14 @@
   window.pluginShowSection = function(id) {
     activePluginSection = activePluginSection === id ? null : id;
     applyPluginSection();
+  };
+  // Abre una sección de plugin por id (la usan los propios plugins, ej. "▶ Ver" del Streaming)
+  window.pluginOpenSection = function(id) {
+    const target = pluginRuntime.sections.find(s => s.id === id);
+    if (!target) return false;
+    activePluginSection = id;
+    applyPluginSection();
+    return true;
   };
   window.pluginCloseSection = function() {
     activePluginSection = null;
@@ -2800,6 +2847,11 @@
   .plugin-preview { background: #070a12; border: 1px solid #1e293b; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
   #plugin-add-error { border-color: rgba(239,68,68,0.3); color: #fca5a5; }
   .plugin-modal-body { font-size: 12.5px; color: #cbd5e1; line-height: 1.55; overflow: auto; max-height: 55vh; }
+  /* Flags de plugins en el modal de mapeo (checkboxes inyectados → :global) */
+  .map-flags { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: #070a12; border: 1px solid #1e293b; border-radius: 8px; }
+  :global(.plx-flag-label) { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; font-weight: 500; text-transform: none; letter-spacing: 0; color: #cbd5e1; cursor: pointer; user-select: none; }
+  :global(.plx-flag-label input) { accent-color: #0ea5e9; width: 14px; height: 14px; flex-shrink: 0; transform: translateY(1px); cursor: pointer; }
+  :global(.plx-flag-label small) { color: #64748b; font-size: 11px; font-weight: 400; }
   .Search.section-open .search-wrap,
   .Search.section-open .controls,
   .Search.section-open #quota-info,

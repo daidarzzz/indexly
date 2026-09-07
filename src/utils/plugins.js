@@ -88,6 +88,7 @@ export function createPluginRuntime(host) {
   const cardActions = [];
   const sections = [];
   const footers = [];
+  const indexFlags = [];
   const listeners = [];
   const registeredIds = new Set();
 
@@ -146,6 +147,17 @@ export function createPluginRuntime(host) {
       addFooter(html) {
         footers.push({ pluginId: plugin.id, html: String(html ?? "") });
       },
+      // Marca configurable por fuente (checkbox en el modal de mapeo).
+      // Cada flag se persiste en index.flags y el plugin la consulta con getIndexFlag().
+      addIndexFlag(cfg) {
+        if (!cfg || !cfg.id || typeof cfg.label !== "string") return;
+        indexFlags.push({
+          pluginId: plugin.id,
+          id: String(cfg.id),
+          label: String(cfg.label),
+          hint: cfg.hint ? String(cfg.hint).slice(0, 120) : "",
+        });
+      },
       // ---- persistencia namespaced por plugin ----
       storage: {
         async get(key) {
@@ -200,5 +212,5 @@ export function createPluginRuntime(host) {
     }
   }
 
-  return { activateAll, emit, chips, cardActions, sections, footers, registeredIds };
+  return { activateAll, emit, chips, cardActions, sections, footers, indexFlags, registeredIds };
 }
