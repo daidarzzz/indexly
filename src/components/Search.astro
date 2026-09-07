@@ -1632,14 +1632,13 @@
         }));
         hasMore = false;
       } else if (hubTab === "plugins") {
-        // Fallback: si la migración kind aún no está aplicada, filtra por tag 'plugin'
-        const tryKinds = ["kind", "tags"];
+        // kind=plugin (migración aplicada); fallback tags=plugin (pendiente, el wizard etiqueta 'plugin')
+        const attempts = ["kind=plugin&", "tags=plugin&"];
         let lastErr = null;
         items = null;
-        for (const mode of tryKinds) {
+        for (const attempt of attempts) {
           try {
-            const qs = mode === "kind" ? "kind=plugin&" : "tags=plugin&";
-            const json = await hubFetch(`/packages?${qs}sort=downloads&page=${hubPage}&pageSize=10`);
+            const json = await hubFetch(`/packages?${attempt}sort=downloads&page=${hubPage}&pageSize=10`);
             items = json.data || [];
             hasMore = !!(json.meta && json.meta.hasMore);
             break;
