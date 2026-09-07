@@ -313,8 +313,11 @@
     setup: function (ctx) {
       api = ctx;
       ensureStyles();
-      // Checkbox en el mapeo de cada índice: marca qué fuentes son canales
-      ctx.addIndexFlag({ id: "streaming", label: "Es un índice de streaming", hint: "Aparecerá como canal en la sección Streaming" });
+      // Checkbox en el mapeo de cada índice: marca qué fuentes son canales.
+      // addIndexFlag es API reciente: si el host es antiguo, se ignora sin romper.
+      if (typeof ctx.addIndexFlag === "function") {
+        ctx.addIndexFlag({ id: "streaming", label: "Es un índice de streaming", hint: "Aparecerá como canal en la sección Streaming" });
+      }
       ctx.addSection({ id: "streaming", label: "Streaming", render: renderPage });
       ctx.addChip({ id: "video", label: "Con vídeo", test: function (g) { return !!buildEmbed(g && g.link); } });
       // Botón "▶ Ver" en las cards: abre la página de Streaming con ese vídeo cargado
