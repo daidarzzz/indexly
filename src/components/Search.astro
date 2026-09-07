@@ -2261,9 +2261,11 @@
     try {
       const res = await fetch(fileUrl.toString(), { signal: ctrl.signal });
       if (!res.ok) throw new Error(`Descarga falló (HTTP ${res.status})`);
-      const code = await res.text();
-      // El Hub sirve plugins como manifiesto JSON {plugin:{…}} (r2_url del paquete);
-      // una URL directa a un .js también es válida. Detectamos cuál es.
+      // El Hub guarda los plugins como .json.gz en R2 (gzip) y los .js también pueden
+      // venir comprimidos: baja como blob y descomprime según magic bytes 1f 8b.
+      const blob = await res.blob();
+      const code = await decompressBlobToText(blob);
+      // Detecta qué es: manifiesto JSON {plugin:{…}} (lo que sirve el Hub) o .js crudo.
       let meta = null;
       let pluginCode = code;
       try {
