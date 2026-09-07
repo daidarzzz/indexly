@@ -458,9 +458,11 @@
   }
 
   let confirmCallback = null;
-  function showConfirm(msg, onConfirm) {
+  let confirmCancelCb = null;
+  function showConfirm(msg, onConfirm, onCancel) {
     confirmMsg.textContent = msg;
-    confirmCallback = onConfirm;
+    confirmCallback = onConfirm || null;
+    confirmCancelCb = onCancel || null;
     confirmModal.style.display = "flex";
     confirmModal.setAttribute("aria-hidden","false");
     confirmOk.focus();
@@ -468,9 +470,19 @@
   window.closeConfirmModal = function() {
     confirmModal.style.display = "none";
     confirmModal.setAttribute("aria-hidden","true");
+    const cc = confirmCancelCb;
     confirmCallback = null;
+    confirmCancelCb = null;
+    if (cc) cc();
   };
-  confirmOk.addEventListener("click", () => { const cb = confirmCallback; closeConfirmModal(); if (cb) cb(); });
+  confirmOk.addEventListener("click", () => {
+    const cb = confirmCallback;
+    const cc = confirmCancelCb;
+    confirmCallback = null;
+    confirmCancelCb = null;
+    closeConfirmModal(); // con callbacks a null, no dispara la rama de cancelación
+    if (cb) cb();
+  });
   confirmModal.addEventListener("click", (e) => { if (e.target === confirmModal) closeConfirmModal(); });
 
   function normalizeStr(s) { return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
@@ -626,6 +638,7 @@
     idx.games = entry.games;
     idx.updatedAt = Date.now();
     await saveIndexesToStorage();
+    pluginRuntime.emit("source:updated", { source: { ...idx } });
     updateApp();
     const d = entry.diff;
     showToast(`Fuente actualizada: +${d.added.length} · −${d.removed.length} · ~${d.changed.length}`, "success");
@@ -658,11 +671,14 @@
     try {
       const dataToSave = indexes.map((idx) => ({ id: idx.id, name: idx.name, active: idx.active, rawData: idx.rawData, mapping: idx.mapping || null, pkg: idx.pkg || null, flags: idx.flags || null, updatedAt: idx.updatedAt || null }));
       await set("indexly_saved_indexes", dataToSave);
+      // v2: catch-all de cambios en la biblioteca (la emisión granular corre por su cuenta)
+      pluginRuntime.emit("sources:changed", {});
     } catch (e) { console.error(e); showToast("Error al guardar en IndexedDB", "error"); }
   }
 
   async function handleFiles(files) {
     let addedCount = 0;
+    const addedSources = [];
     for (const file of files) {
       try {
         const text = await file.text();
@@ -674,17 +690,22 @@
         if (existingIdx) { enqueueDiff(existingIdx, rawData, parsedGames); continue; }
         if (parsedGames.length === 0) {
           showToast(`"${file.name}" sin elementos reconocibles — puedes mapearlo`, "warning", 4000);
-          indexes.push({ id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name: indexName, active: true, rawData, mapping: null, pkg: null, games: [] });
+          const emptyIdx = { id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name: indexName, active: true, rawData, mapping: null, pkg: null, games: [] };
+          indexes.push(emptyIdx);
+          addedSources.push(emptyIdx);
           addedCount++;
           continue;
         }
-        indexes.push({ id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name: indexName, active: true, rawData, mapping: null, pkg: null, games: parsedGames });
+        const newIdx = { id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name: indexName, active: true, rawData, mapping: null, pkg: null, games: parsedGames };
+        indexes.push(newIdx);
+        addedSources.push(newIdx);
         addedCount++;
       } catch (error) { console.error(error); showToast(`Error en "${file.name}": ${error.message}`, "error"); }
     }
     if (addedCount > 0) {
       searchInput.removeAttribute("disabled");
       await saveIndexesToStorage(); updateApp();
+      addedSources.forEach(s => pluginRuntime.emit("source:added", { source: { ...s } }));
       showToast(`${addedCount} fuente(s) añadida(s)`, "success");
     }
     processDiffQueue();
@@ -724,9 +745,11 @@
       const indexName = (rawData && rawData.name) ? rawData.name : `Pegado ${new Date().toLocaleTimeString()}`;
       const existingIdx = indexes.find(x=>x.name.toLowerCase()===indexName.toLowerCase());
       if (existingIdx) { enqueueDiff(existingIdx, rawData, parsedGames); processDiffQueue(); return; }
-      indexes.push({ id: Date.now().toString()+Math.random().toString(36).substring(2,7), name: indexName, active:true, rawData, mapping:null, pkg: null, games: parsedGames });
+      const pastedIdx = { id: Date.now().toString()+Math.random().toString(36).substring(2,7), name: indexName, active:true, rawData, mapping:null, pkg: null, games: parsedGames };
+      indexes.push(pastedIdx);
       searchInput.removeAttribute("disabled");
       await saveIndexesToStorage(); updateApp();
+      pluginRuntime.emit("source:added", { source: { ...pastedIdx } });
       showToast(`Fuente "${indexName}" creada desde portapapeles`, "success");
     } catch {}
   });
@@ -901,18 +924,25 @@
     if (!pendingImportData) return;
     const idxs = getSelectedIds(importSelectList).map(Number);
     if (idxs.length===0) return;
-    let imported=0; let skipped=[];
+    let imported=0; let skipped=[]; const importedSources=[];
     for (const i of idxs) {
       const item = pendingImportData[i];
       if (!item || !item.rawData) { skipped.push(String(item?.name||i)); continue; }
       if (indexes.some(x=>x.name.toLowerCase()===String(item.name).toLowerCase())) { skipped.push(item.name); continue; }
       const parsed = normalizeJson(item.rawData, item.name, item.mapping || null);
-      indexes.push({ id: Date.now().toString()+Math.random().toString(36).substring(2,7), name: item.name, active: item.active ?? true, rawData: item.rawData, mapping: item.mapping||null, pkg: item.pkg||null, games: parsed });
+      const importedIdx = { id: Date.now().toString()+Math.random().toString(36).substring(2,7), name: item.name, active: item.active ?? true, rawData: item.rawData, mapping: item.mapping||null, pkg: item.pkg||null, games: parsed };
+      indexes.push(importedIdx);
+      importedSources.push(importedIdx);
       imported++;
     }
     const hadSkipped = skipped.length>0;
     closeImportSelectModal();
-    if (imported) { searchInput.removeAttribute("disabled"); await saveIndexesToStorage(); updateApp(); showToast(`${imported} fuente(s) importadas`, "success"); }
+    if (imported) {
+      searchInput.removeAttribute("disabled");
+      await saveIndexesToStorage(); updateApp();
+      importedSources.forEach(s => pluginRuntime.emit("source:added", { source: { ...s } }));
+      showToast(`${imported} fuente(s) importadas`, "success");
+    }
     if (hadSkipped) showToast(`Omitidas: ${skipped.join(", ")}`, "warning", 4000);
     if (!imported && !hadSkipped) showToast("Nada que importar", "warning");
   });
@@ -947,8 +977,11 @@
   document.getElementById("bulk-clear").addEventListener("click", () => {
     if (indexes.length===0) return;
     showConfirm(`¿Borrar todas las fuentes (${indexes.length})? No se puede deshacer en bloque.`, async () => {
+      const removed = indexes.map(i => ({ id: i.id, name: i.name }));
       indexes = []; searchInput.value=""; searchInput.setAttribute("disabled","true");
-      await saveIndexesToStorage(); updateApp(); showToast("Todas las fuentes borradas", "info");
+      await saveIndexesToStorage(); updateApp();
+      removed.forEach(r => pluginRuntime.emit("source:removed", r));
+      showToast("Todas las fuentes borradas", "info");
     });
   });
 
@@ -966,6 +999,7 @@
       indexes = indexes.filter((i) => i.id !== id);
       if (indexes.length === 0) { searchInput.setAttribute("disabled", "true"); searchInput.value = ""; }
       await saveIndexesToStorage(); updateApp();
+      pluginRuntime.emit("source:removed", { id, name: idx.name });
       showToast(`${idx.name} eliminada`, "info", 6000, {
         label: "Deshacer",
         onClick: async () => {
@@ -1091,6 +1125,7 @@
     readMappingFlags(idx);
     idx.games = normalizeJson(idx.rawData, idx.name, mapping);
     await saveIndexesToStorage();
+    pluginRuntime.emit("source:updated", { source: { ...idx } });
     closeMappingModal();
     updateApp();
     showToast("Mapeo actualizado", "success");
@@ -1104,12 +1139,21 @@
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && exportModal.style.display !== "none") closeExportModal(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && importSelectModal.style.display !== "none") closeImportSelectModal(); });
 
+  let lastEmittedQuery = null;
   function renderSearch() {
     let activeGames = [];
     indexes.forEach((index) => { if (index.active) activeGames = activeGames.concat(index.games); });
     const rawQ = searchInput.value.trim();
+    if (rawQ !== lastEmittedQuery) { lastEmittedQuery = rawQ; pluginRuntime.emit("query:change", { query: rawQ }); }
     syncQueryToURL(rawQ);
     const query = normalizeStr(rawQ);
+    // v2: filtros de búsqueda registrados por plugins. Sin filtros → pipeline idéntico.
+    if (pluginRuntime.searchFilters.length) {
+      activeGames = pluginRuntime.searchFilters.reduce((acc, f) => {
+        try { const out = f.fn(acc); return Array.isArray(out) ? out : acc; }
+        catch (err) { console.error("[IndexLy] searchFilter de \"" + f.pluginId + "\":", err); return acc; }
+      }, activeGames);
+    }
     if (activeFilter==="link") activeGames = activeGames.filter(g=> g.link && g.link.trim());
     else if (activeFilter==="nolink") activeGames = activeGames.filter(g=> !g.link || !g.link.trim());
     else if (typeof activeFilter==="string" && activeFilter.startsWith("plx:")) {
@@ -1179,6 +1223,7 @@
       indexes = indexes.filter(i => !ids.has(i.id));
       if (indexes.length === 0) { searchInput.setAttribute("disabled", "true"); searchInput.value = ""; }
       await saveIndexesToStorage(); updateApp();
+      items.forEach(i => pluginRuntime.emit("source:removed", { id: i.id, name: i.name }));
       showToast(`Paquete "${label}" eliminado`, "info", 6000, {
         label: "Deshacer",
         onClick: async () => {
@@ -1196,6 +1241,25 @@
       undoTimer = setTimeout(()=>{ lastRemoved = null; }, 6500);
     });
   };
+  // v2: botones de sourceAction registrados por plugins, filtrados por match(source)
+  function pluginSourceActionsHtml(index) {
+    const acts = pluginRuntime.sourceActions;
+    if (!acts.length) return "";
+    return acts.map((a) => {
+      let ok = true;
+      try { ok = a.match ? !!a.match(index) : true; } catch { ok = false; }
+      if (!ok) return "";
+      const text = a.short || a.label;
+      return `<button type="button" class="action-btn map" onclick="pluginSourceAction('${escapeHtml(a.pluginId)}','${escapeHtml(a.id)}','${index.id}')" title="${escapeHtml(a.label)}" aria-label="${escapeHtml(a.label)}: ${escapeHtml(index.name)}">${escapeHtml(text)}</button>`;
+    }).join("");
+  }
+  window.pluginSourceAction = function(pluginId, actionId, sourceId) {
+    const idx = indexes.find(i => i.id === sourceId);
+    if (!idx) return;
+    const act = pluginRuntime.sourceActions.find(a => a.pluginId === pluginId && a.id === actionId);
+    if (!act) return;
+    try { act.onClick({ ...idx }); } catch (err) { console.error("[IndexLy] sourceAction:", err); }
+  };
   function indexPillHtml(index) {
     const coverBg = coverGradientStyle(index.name);
     const initial = (String(index.name || "?").trim().charAt(0) || "?").toUpperCase();
@@ -1210,6 +1274,7 @@
         </div>
         <div class="index-pill-actions">
           <button type="button" class="action-btn map" onclick="openMappingModal('${index.id}')" title="Ajustar mapeo" aria-label="Ajustar ${escapeHtml(index.name)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+          ${pluginSourceActionsHtml(index)}
           <button type="button" class="index-switch" role="switch" aria-checked="${index.active ? "true" : "false"}" aria-label="${index.active ? "Desactivar" : "Activar"} ${escapeHtml(index.name)}" title="${index.active ? "Desactivar" : "Activar"}" onclick="toggleIndex('${index.id}')"><span class="knob" aria-hidden="true"></span></button>
           <button type="button" class="action-btn delete" onclick="removeIndex('${index.id}')" title="Eliminar" aria-label="Eliminar ${escapeHtml(index.name)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
         </div>
@@ -1908,6 +1973,70 @@
       return null;
     }
   }
+  // v2: escritura de fuentes existentes para plugins con permiso "data:write"
+  function pluginSourcesGet(id) {
+    const idx = indexes.find(i => i.id === id);
+    return idx ? { ...idx } : null;
+  }
+  async function pluginSourcesUpdate(id, patch, pluginId) {
+    const idx = indexes.find(i => i.id === id);
+    if (!idx) throw new Error("Fuente no encontrada");
+    const p = patch && typeof patch === "object" ? patch : {};
+    if (p.name !== undefined) {
+      const n = String(p.name).trim().slice(0, 60);
+      if (!n) throw new Error("El nombre no puede estar vacío");
+      if (n.toLowerCase() !== idx.name.toLowerCase() && indexes.some(x => x.id !== id && x.name.toLowerCase() === n.toLowerCase())) throw new Error(`Ya existe una fuente "${n}"`);
+      idx.name = n;
+    }
+    if (p.active !== undefined) idx.active = !!p.active;
+    if (p.flags !== undefined && p.flags && typeof p.flags === "object") idx.flags = { ...(idx.flags || {}), ...p.flags };
+    if (p.mapping !== undefined) idx.mapping = (p.mapping && p.mapping.titleKey) ? { titleKey: String(p.mapping.titleKey), subtitleKey: p.mapping.subtitleKey ? String(p.mapping.subtitleKey) : null, linkKey: p.mapping.linkKey ? String(p.mapping.linkKey) : null } : null;
+    if (p.rawData !== undefined && p.rawData !== null) idx.rawData = p.rawData;
+    if (p.mapping !== undefined || p.rawData !== undefined) idx.games = normalizeJson(idx.rawData, idx.name, idx.mapping);
+    idx.updatedAt = Date.now();
+    await saveIndexesToStorage();
+    updateApp();
+    pluginRuntime.emit("source:updated", { source: { ...idx }, pluginId });
+    return { ...idx };
+  }
+  function pluginSourcesRemove(id, pluginId) {
+    return new Promise((resolve) => {
+      const idx = indexes.find(i => i.id === id);
+      if (!idx) { resolve(false); return; }
+      const p = installedPlugins.find(x => x.id === pluginId);
+      showConfirm(
+        `El plugin "${p ? p.name : pluginId}" quiere eliminar la fuente "${idx.name}". ¿Permitirlo?`,
+        async () => {
+          if (undoTimer) clearTimeout(undoTimer);
+          const at = indexes.findIndex(x => x.id === id);
+          lastRemoved = { data: idx, index: at };
+          indexes = indexes.filter(x => x.id !== id);
+          if (indexes.length === 0) { searchInput.setAttribute("disabled", "true"); searchInput.value = ""; }
+          await saveIndexesToStorage();
+          updateApp();
+          pluginRuntime.emit("source:removed", { id, name: idx.name, pluginId });
+          showToast(`Fuente "${idx.name}" eliminada por plugin`, "info", 6000, {
+            label: "Deshacer",
+            onClick: async () => {
+              if (lastRemoved && lastRemoved.data && lastRemoved.data.id === id) {
+                const pos = Math.min(lastRemoved.index, indexes.length);
+                indexes.splice(pos, 0, lastRemoved.data);
+                lastRemoved = null;
+                if (undoTimer) { clearTimeout(undoTimer); undoTimer = null; }
+                if (indexes.length >= 1) searchInput.removeAttribute("disabled");
+                await saveIndexesToStorage();
+                updateApp();
+                showToast("Fuente restaurada", "success");
+              }
+            }
+          });
+          undoTimer = setTimeout(() => { lastRemoved = null; }, 6500);
+          resolve(true);
+        },
+        () => resolve(false)
+      );
+    });
+  }
   const pluginHost = {
     showToast: (msg, type, duration) => showToast(msg, type, duration),
     modal: (opts) => openPluginModalFor(opts),
@@ -1916,6 +2045,10 @@
     getFilteredGames: () => currentFilteredGames.slice(),
     getQuery: () => searchInput.value.trim(),
     addSource: pluginAddSource,
+    sourcesGet: pluginSourcesGet,
+    sourcesUpdate: pluginSourcesUpdate,
+    sourcesRemove: pluginSourcesRemove,
+    normalize: (rawData, name, mapping) => normalizeJson(rawData, name, mapping || null),
     refreshApp: () => updateApp(),
     escapeHtml,
     debounce,

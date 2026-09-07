@@ -89,12 +89,17 @@ export function createPluginRuntime(host) {
   const sections = [];
   const footers = [];
   const indexFlags = [];
+  const sourceActions = [];
+  const searchFilters = [];
   const listeners = [];
   const registeredIds = new Set();
 
   function apiFor(plugin) {
     const api = {
       info: { id: plugin.id, name: plugin.name, version: plugin.version || "1.0.0", permissions: (plugin.permissions || []).slice() },
+      // Versión de la API de plugins expuesta al plugin (v1 = pre-2026, v2 = esta).
+      // Un plugin puede detectar capacidades con: if (IndexLy.apiVersion >= 2) { ... }
+      apiVersion: 2,
       register(def) {
         if (def && typeof def.setup === "function") def.setup(api);
       },
@@ -106,6 +111,25 @@ export function createPluginRuntime(host) {
       // ---- escritura limitada: añadir fuentes ----
       addSource(input) { return host.addSource(input, plugin.id); },
       refreshApp() { host.refreshApp(); },
+      // ---- escritura de fuentes existentes (v2) — requiere permiso "data:write".
+      //      Compatibilidad: los plugins v1 no lo usan; los métodos existen pero
+      //      lanzan un error orientativo si el permiso no está declarado. ----
+      sources: {
+        get(id) {
+          if (!(plugin.permissions || []).includes("data:write")) throw new Error('sources.get requiere el permiso "data:write" en la cabecera del plugin');
+          return host.sourcesGet(id);
+        },
+        async update(id, patch) {
+          if (!(plugin.permissions || []).includes("data:write")) throw new Error('sources.update requiere el permiso "data:write" en la cabecera del plugin');
+          return host.sourcesUpdate(id, patch, plugin.id);
+        },
+        async remove(id) {
+          if (!(plugin.permissions || []).includes("data:write")) throw new Error('sources.remove requiere el permiso "data:write" en la cabecera del plugin');
+          return host.sourcesRemove(id, plugin.id);
+        },
+      },
+      // ---- motor de normalización del host (v2) ----
+      normalize(rawData, name, mapping) { return host.normalize(rawData, name, mapping); },
       // ---- eventos ----
       on(event, fn) {
         if (typeof fn !== "function") return () => {};
@@ -166,6 +190,22 @@ export function createPluginRuntime(host) {
           hint: cfg.hint ? String(cfg.hint).slice(0, 120) : "",
         });
       },
+      // Botón en cada pill de fuente (v2): match(source) filtra dónde aparece
+      addSourceAction(cfg) {
+        if (!cfg || !cfg.id || typeof cfg.onClick !== "function") return;
+        sourceActions.push({
+          pluginId: plugin.id,
+          id: String(cfg.id),
+          label: String(cfg.label || cfg.id),
+          short: cfg.short ? String(cfg.short).slice(0, 8) : null,
+          match: typeof cfg.match === "function" ? cfg.match : null,
+          onClick: cfg.onClick,
+        });
+      },
+      // Filtro de búsqueda (v2): fn(games[]) → games[]; se aplica antes del matching
+      addSearchFilter(fn) {
+        if (typeof fn === "function") searchFilters.push({ pluginId: plugin.id, fn });
+      },
       // ---- persistencia namespaced por plugin ----
       storage: {
         async get(key) {
@@ -220,5 +260,5 @@ export function createPluginRuntime(host) {
     }
   }
 
-  return { activateAll, emit, chips, cardActions, sections, footers, indexFlags, registeredIds };
+  return { activateAll, emit, chips, cardActions, sections, footers, indexFlags, sourceActions, searchFilters, registeredIds };
 }
