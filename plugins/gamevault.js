@@ -1,7 +1,7 @@
 /* IndexLy Plugin
    id: gamevault
    name: GameVault
-   version: 1.3.0
+   version: 1.3.2
    description: Tu colección de juegos: busca en GameDB (datos de IGDB publicados por LizardByte, sin claves ni configuración), guarda juegos con carátulas y ficha completa, y asígnales fuentes de descarga desde tus propios índices. Incluye auto-match, estadísticas y añadido manual.
    permissions: network, ui, storage
 */
@@ -1447,6 +1447,40 @@
       ensureStyles();
       ensureGames(function () {});
       ctx.addSection({ id: "gamevault", label: "GameVault", render: renderPage });
+      // Documentación propia en /ayuda (host de stubs en esa página: los demás slots no aplican)
+      if (typeof ctx.addDocSection === "function") {
+        ctx.addDocSection({
+          id: "gamevault",
+          title: "GameVault — tu colección de juegos",
+          html:
+            "<p><strong>GameVault</strong> añade una pestaña donde guardar tu colección de juegos" +
+            " con carátulas, ficha completa y <strong>fuentes de descarga</strong> enlazadas a tus" +
+            " propios índices de IndexLy. No necesita ninguna configuración.</p>" +
+            "<ul>" +
+            "<li><strong>Buscar juegos</strong>: la búsqueda usa <code>GameDB</code> (copia pública" +
+            " de IGDB, actualizada a diario). Escribe el nombre y pulsa «＋ Añadir»: se guarda con" +
+            " banner, descripción, rating y fecha. También puedes <strong>añadir a mano</strong> un" +
+            " juego con imagen por URL.</li>" +
+            "<li><strong>Estados</strong>: marca cada juego como Backlog, Jugando, Terminado o" +
+            " Abandonado. Los chips de la biblioteca filtran por estado.</li>" +
+            "<li><strong>Fuentes de descarga</strong>: dentro de un juego, «＋ Añadir fuentes» abre" +
+            " un buscador sobre tus propios índices. Añade todos los elementos que quieras con «＋»" +
+            " y pulsa «Listo». Desde entonces, cada fuente tiene su botón" +
+            " <strong>«Descargar ↗»</strong> (abre el magnet o enlace).</li>" +
+            "<li><strong>＋ Vault</strong>: al buscar en IndexLy, cada tarjeta tiene este botón para" +
+            " guardar el elemento como juego en la vault (con su fuente ya enlazada). Si el juego" +
+            " ya existe, la fuente se añade a la ficha existente.</li>" +
+            "<li><strong>Auto-match</strong>: desde la biblioteca, escanea una fuente entera y" +
+            " busca cada título en GameDB (limpia versiones/repacks del nombre). Tú confirmas cada" +
+            " juego antes de añadirlo y puede fusionar fuentes de juegos ya guardados.</li>" +
+            "<li><strong>Backup</strong>: en Ajustes puedes exportar/importar la vault como JSON," +
+            " y consultar estadísticas (estados, géneros, años).</li>" +
+            "</ul>" +
+            "<p><strong>Privacidad</strong>: la colección vive en tu navegador (IndexedDB) y solo" +
+            " se consultan <code>app.lizardbyte.dev</code> (GameDB) e" +
+            " <code>images.igdb.com</code> para las imágenes. Nada más.</p>",
+        });
+      }
       // Botón en los resultados de búsqueda de IndexLy: añade el título a la vault
       // con ese item como primera fuente (GameDB lo enriquece en segundo plano).
       ctx.addCardAction({
