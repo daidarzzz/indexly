@@ -1772,7 +1772,9 @@
           try {
             const rec = await installPluginFromManifest(info, pl.code);
             try { await hubFetch(`/packages/${encodeURIComponent(slug)}/download`, { method: "POST" }); } catch {}
-            showToast(`Plugin "${rec.name}" instalado y activado`, "success");
+            const stored = installedPlugins.find(p => p.id === rec.id);
+            if (stored && stored._error) showToast(`Instalado pero falló al activar: ${stored._error}`, "error", 6000);
+            else showToast(`Plugin "${rec.name}" instalado y activado`, "success");
           } catch (err) {
             showToast(`No se pudo instalar: ${err.message}`, "error", 5000);
           }
@@ -2119,6 +2121,7 @@
   }
   // Instala y activa un plugin desde un manifiesto válido. Usada por el modal
   // de instalación (fichero/URL) y por el flujo del Hub (hubInstallPlugin).
+  // IMPORTANTE: persistir ANTES de activar — activateAll() re-lee desde IndexedDB.
   async function installPluginFromManifest(m, code) {
     if (!m || !m.id) throw new Error("Manifiesto sin id");
     if (installedPlugins.some(p => p.id === m.id)) throw new Error(`Ya existe un plugin con el id "${m.id}". Elimínalo primero.`);
@@ -2130,13 +2133,13 @@
     };
     installedPlugins.push(rec);
     try {
+      await saveStoredPlugins(installedPlugins);
       installedPlugins = await pluginRuntime.activateAll();
     } catch (err) {
       installedPlugins = installedPlugins.filter(p => p.id !== rec.id);
       try { await saveStoredPlugins(installedPlugins); } catch {}
       throw err;
     }
-    await saveStoredPlugins(installedPlugins);
     renderPluginsCard();
     renderPluginChips();
     injectPluginFooters();
@@ -2149,7 +2152,9 @@
     try {
       const rec = await installPluginFromManifest(pendingPlugin.meta, pendingPlugin.code);
       window.closePluginAddModal();
-      showToast(`Plugin "${rec.name}" instalado`, "success");
+      const stored = installedPlugins.find(p => p.id === rec.id);
+      if (stored && stored._error) showToast(`Instalado pero falló al activar: ${stored._error}`, "error", 6000);
+      else showToast(`Plugin "${rec.name}" instalado`, "success");
       pendingPlugin = null;
     } catch (err) {
       showPluginAddError(`No se pudo instalar: ${err.message}`);
