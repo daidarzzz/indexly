@@ -122,7 +122,15 @@ export function createPluginRuntime(host) {
       openLink(url) {
         try {
           const u = new URL(String(url), window.location.href);
+          // http(s): páginas normales · magnet: descarga P2P vía handler del SO (anchor click)
           if (u.protocol === "http:" || u.protocol === "https:") window.open(u.toString(), "_blank", "noopener");
+          else if (u.protocol === "magnet:" && u.toString().length > 8) {
+            const a = document.createElement("a");
+            a.href = u.toString();
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+          }
         } catch {}
       },
       // ---- slots ----
