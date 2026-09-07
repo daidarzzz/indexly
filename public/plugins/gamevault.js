@@ -1,8 +1,8 @@
 /* IndexLy Plugin
    id: gamevault
    name: GameVault
-   version: 1.2.0
-   description: Tu colección de juegos: busca en RAWG (con tu API key, gratis), guarda juegos con banners y asígnales fuentes de descarga desde tus propios índices. Incluye auto-match, estadísticas y añadido manual. Sin key, la vault funciona igual.
+   version: 1.3.0
+   description: Tu colección de juegos: busca en GameDB (datos de IGDB publicados por LizardByte, sin claves ni configuración), guarda juegos con carátulas y ficha completa, y asígnales fuentes de descarga desde tus propios índices. Incluye auto-match, estadísticas y añadido manual.
    permissions: network, ui, storage
 */
 (function () {
@@ -27,7 +27,7 @@
   // vive en state.am { indexId, items[], running, done, progress, total }
   // items[]: { key, title, clean, link, indexId, indexName, status, result, keep, error }
 
-  var RAWG_BASE = "https://api.rawg.io/api/";
+  var GDB_BASE = "https://app.lizardbyte.dev/GameDB/";
   var STATUSES = [
     { id: "backlog", label: "Backlog", color: "#94a3b8" },
     { id: "playing", label: "Jugando", color: "#0ea5e9" },
@@ -93,10 +93,6 @@
     return api.storage.set("gv_games", gamesCache || []);
   }
 
-  function getSettings(cb) {
-    return api.storage.get("gv_settings").then(function (s) { cb((s && typeof s === "object") ? s : { rawgKey: "" }); });
-  }
-
   function findGame(id) {
     return (gamesCache || []).find(function (g) { return g.id === id; }) || null;
   }
@@ -106,7 +102,7 @@
   function rerender() { if (pageRoot) renderPage(pageRoot); }
 
   // ---------- auto-match ----------
-  // Detecta los títulos de un índice, los busca en RAWG (1 req/título, tope 60,
+  // Detecta los títulos de un índice, los busca en GameDB (IGDB), tope 60,
   // 3 en paralelo) y muestra cada coincidencia para confirmar antes de añadir.
   // Los juegos añadidos quedan enlazados al item como primera fuente; si el juego
   // ya estaba en la vault, se le puede fusionar la fuente.
@@ -128,8 +124,8 @@
     return { name: t, year: year };
   }
 
-  function gameInVaultByRawg(id) {
-    return (gamesCache || []).find(function (g) { return g.rawgId != null && String(g.rawgId) === String(id); }) || null;
+  function gameInVaultByGdb(id) {
+    return (gamesCache || []).find(function (g) { return g.gdbId != null && String(g.gdbId) === String(id); }) || null;
   }
 
   function amatchBuildItems(index) {
@@ -172,13 +168,10 @@
       }
       it.status = "searching";
       amatchUpdateRow(it);
-      var params = { search: it.clean.name, page_size: "3" };
-      if (it.clean.year) params.dates = it.clean.year + "-01-01," + it.clean.year + "-12-31";
-      rawgFetch("games", params).then(function (json) {
-        var hit = json && Array.isArray(json.results) && json.results[0] ? json.results[0] : null;
-        if (hit && gameInVaultByRawg(hit.id)) {
-          it.result = hit; it.status = "invault"; it.keep = true;
-        } else if (hit) {
+      // Resultado = {id, name} del bucket. La ficha completa se baja al confirmar.
+      gdbSearch(it.clean.name).then(function (hits) {
+        var hit = hits.length ? hits[0] : null;
+        if (hit) {
           it.result = hit; it.status = "found"; it.keep = true;
         } else {
           it.status = "nomatch"; it.keep = false;
@@ -198,98 +191,168 @@
 
   function amatchConfirm() {
     var am = state.am;
-    var added = 0, merged = 0;
-    am.items.forEach(function (it) {
-      if (!it.keep || !it.result) return;
-      if (it.status === "found") {
-        var dup = (gamesCache || []).some(function (g) { return g.rawgId != null && String(g.rawgId) === String(it.result.id); });
-        if (dup) return;
-        var src = it.link ? [{ indexId: it.indexId, sourceName: it.indexName, itemTitle: it.title, itemLink: it.link }] : [];
-        var d = mapRawg(it.result);
-        gamesCache.push({
-          id: "g" + Date.now() + Math.random().toString(36).slice(2, 6),
-          name: d.name, imageUrl: d.imageUrl, rating: d.rating, metacritic: d.metacritic,
-          released: d.released, genres: d.genres, platforms: d.platforms, website: d.website,
-          description: d.description, screenshots: d.screenshots, rawgId: d.rawgId, rawgUrl: d.rawgUrl,
-          status: "backlog", addedAt: Date.now(), sources: src,
-        });
-        added++;
-      } else if (it.status === "invault") {
-        var cur = gameInVaultByRawg(it.result.id);
-        if (cur && it.link && !(cur.sources || []).some(function (s) { return s.itemLink === it.link; })) {
-          cur.sources = cur.sources || [];
-          cur.sources.push({ indexId: it.indexId, sourceName: it.indexName, itemTitle: it.title, itemLink: it.link });
-          merged++;
-        }
+    var kept = am.items.filter(function (it) { return it.keep && it.result && it.status === "found"; });
+    if (!kept.length) { api.showToast("Nada seleccionado", "info"); return; }
+    var btn = document.getElementById("gv-am-confirm");
+    var added = 0, merged = 0, done = 0;
+    function step() {
+      var it = kept[done];
+      if (!it) {
+        saveGames();
+        var msg = (added === 1 ? "1 juego añadido" : added + " juegos añadidos") + (merged ? " · " + merged + " fuentes fusionadas" : "");
+        api.showToast(msg, "success", 4000);
+        go("library");
+        return;
       }
-    });
-    saveGames();
-    var msg = added === 0 && merged === 0 ? "Nada que añadir" : (added === 1 ? "1 juego añadido" : added + " juegos añadidos") + (merged ? " · " + merged + " fuentes fusionadas" : "");
-    api.showToast(msg, "success", 4000);
-    go("library");
+      if (btn) { btn.disabled = true; btn.textContent = "Añadiendo " + (done + 1) + " / " + kept.length + "…"; }
+      gdbGame(it.result.id).then(function (j) {
+        var detail = j || { id: it.result.id, name: it.result.name, url: "" };
+        var existing = gameInVaultByGdb(detail.id);
+        if (existing) {
+          if (it.link && !(existing.sources || []).some(function (s) { return s.itemLink === it.link; })) {
+            existing.sources = existing.sources || [];
+            existing.sources.push({ indexId: it.indexId, sourceName: it.indexName, itemTitle: it.title, itemLink: it.link });
+            merged++;
+          }
+        } else {
+          var src = it.link ? [{ indexId: it.indexId, sourceName: it.indexName, itemTitle: it.title, itemLink: it.link }] : [];
+          addGdbGame(detail, src);
+          added++;
+        }
+      }).catch(function () { }).then(function () {
+        done++;
+        step();
+      });
+    }
+    step();
   }
 
-  // ---------- RAWG ----------
+  // ---------- GameDB (datos IGDB vía LizardByte) — sin configuración ----------
 
-  function rawgFetch(path, params) {
-    return getSettings(function () {}).then(function (settings) {
-      if (!settings.rawgKey) throw new Error("Configura tu API key de RAWG en Ajustes");
-      var qs = new URLSearchParams(params || {});
-      qs.set("key", settings.rawgKey);
-      var ctrl = new AbortController();
-      var timer = setTimeout(function () { ctrl.abort(); }, 15000);
-      return fetch(RAWG_BASE + path + "?" + qs.toString(), { signal: ctrl.signal })
-        .then(function (res) {
-          if (res.status === 401) throw new Error("API key de RAWG no válida");
-          if (res.status === 429) throw new Error("Límite de RAWG alcanzado (20.000/mes en el plan gratis)");
-          if (!res.ok) throw new Error("RAWG respondió " + res.status);
-          return res.json();
-        })
-        .finally(function () { clearTimeout(timer); });
+  function gdbJson(path) {
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, 15000);
+    return fetch(GDB_BASE + path, { signal: ctrl.signal })
+      .then(function (res) {
+        clearTimeout(timer);
+        if (res.status === 404) return null;
+        if (!res.ok) throw new Error("GameDB respondió " + res.status);
+        return res.json();
+      })
+      .catch(function (err) { clearTimeout(timer); throw err; });
+  }
+
+  // Imágenes IGDB: la ficha trae t_thumb; pedimos tamaños mayores reescribiendo el prefijo
+  function igdbImg(url, size) {
+    if (!url) return "";
+    var u = String(url);
+    if (u.indexOf("//") === 0) u = "https:" + u;
+    return u.replace("/t_thumb/", "/t_" + (size || "thumb") + "/");
+  }
+
+  var gdbBucketCache = {};   // key -> Promise<{id:{name}}>
+  var gdbPlatformsPromise = null; // Promise<{id: name}>
+
+  function gdbBucket(key) {
+    if (!gdbBucketCache[key]) gdbBucketCache[key] = gdbJson("buckets/" + encodeURIComponent(key) + ".json");
+    return gdbBucketCache[key];
+  }
+
+  function gdbPlatforms() {
+    if (!gdbPlatformsPromise) {
+      gdbPlatformsPromise = gdbJson("platforms/all.json").then(function (j) {
+        var map = {};
+        Object.keys(j || {}).forEach(function (id) { map[id] = (j[id] && j[id].name) || id; });
+        return map;
+      });
+    }
+    return gdbPlatformsPromise;
+  }
+
+  // Búsqueda: bucket por las 2 primeras letras alfanuméricas del término
+  // (con fallback al bucket de 1 letra si el segundo carácter original es un espacio)
+  function gdbSearch(q) {
+    var nq = normStr(q).replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+    if (!nq) return Promise.resolve([]);
+    var sq = nq.replace(/[^a-z0-9]/g, "");
+    var keys = [];
+    if (sq) keys.push(sq.slice(0, 2));
+    if (/^[a-z0-9] /.test(nq) && nq.charAt(0) !== sq.slice(0, 1)) keys.push(nq.charAt(0));
+    return Promise.all(keys.map(gdbBucket)).then(function (buckets) {
+      var pool = {};
+      buckets.forEach(function (b) { if (b) Object.keys(b).forEach(function (id) { if (!pool[id]) pool[id] = b[id]; }); });
+      var res = [];
+      var words = nq.split(" ").filter(Boolean);
+      Object.keys(pool).forEach(function (id) {
+        var name = (pool[id] && pool[id].name) || "";
+        var nn = normStr(name);
+        var rank = -1;
+        if (nn === nq) rank = 0;
+        else if (nn.indexOf(nq) === 0) rank = 1;
+        else if (nn.indexOf(nq) >= 0) rank = 2;
+        else if (words.length > 1 && words.every(function (w) { return nn.indexOf(w) >= 0; })) rank = 3;
+        if (rank >= 0) res.push({ id: id, name: name, rank: rank });
+      });
+      res.sort(function (a, b) {
+        return a.rank - b.rank || (Number(a.id) || 0) - (Number(b.id) || 0) || a.name.localeCompare(b.name);
+      });
+      return res.slice(0, 20);
     });
   }
 
-  function rawgDetail(id) {
-    return getSettings(function () {}).then(function (settings) {
-      if (!settings.rawgKey) throw new Error("Sin API key de RAWG");
-      var ctrl = new AbortController();
-      var timer = setTimeout(function () { ctrl.abort(); }, 15000);
-      return fetch(RAWG_BASE + "games/" + encodeURIComponent(id) + "?key=" + encodeURIComponent(settings.rawgKey), { signal: ctrl.signal })
-        .then(function (res) {
-          if (!res.ok) throw new Error("RAWG respondió " + res.status);
-          return res.json();
-        })
-        .finally(function () { clearTimeout(timer); });
-    });
+  function gdbGame(id) {
+    return gdbJson("games/" + encodeURIComponent(id) + ".json");
   }
 
-  // Mapa RAWG (resultado de búsqueda o detalle) → registro de vault parcial
-  function mapRawg(r) {
+  // Mapa ficha GameDB → registro de vault
+  function mapGameDB(j) {
+    var minDate = null;
+    (Array.isArray(j.release_dates) ? j.release_dates : []).forEach(function (rd) {
+      if (rd && rd.date && (minDate === null || rd.date < minDate)) minDate = rd.date;
+    });
+    var released = minDate ? new Date(minDate * 1000).toISOString().slice(0, 10) : "";
+    var developer = "";
+    (Array.isArray(j.involved_companies) ? j.involved_companies : []).some(function (c) {
+      if (c && c.developer && c.company && c.company.name) { developer = c.company.name; return true; }
+      return false;
+    });
+    var pegi = null;
+    (Array.isArray(j.age_ratings) ? j.age_ratings : []).forEach(function (ar) {
+      if (ar && ar.organization && /pegi/i.test(ar.organization.name || "") && ar.rating_category) pegi = String(ar.rating_category.rating || "");
+    });
+    var cover = j.cover && j.cover.url ? igdbImg(j.cover.url, "cover_big") : "";
+    var banner = "";
+    if (Array.isArray(j.artworks) && j.artworks[0] && j.artworks[0].url) banner = igdbImg(j.artworks[0].url, "720p");
+    else if (Array.isArray(j.screenshots) && j.screenshots[0] && j.screenshots[0].url) banner = igdbImg(j.screenshots[0].url, "720p");
+    else if (cover) banner = cover;
     return {
-      rawgId: r.id != null ? String(r.id) : null,
-      name: String(r.name || "Sin título").slice(0, 120),
-      imageUrl: r.background_image || "",
-      rating: typeof r.rating === "number" ? Math.round(r.rating * 10) / 10 : null,
-      metacritic: typeof r.metacritic === "number" ? r.metacritic : null,
-      released: r.released || "",
-      genres: Array.isArray(r.genres) ? r.genres.map(function (g) { return g.name; }).filter(Boolean).slice(0, 5) : [],
-      platforms: Array.isArray(r.platforms) ? r.platforms.map(function (p) { return p && p.platform && p.platform.name; }).filter(Boolean).slice(0, 6) : [],
-      website: r.website || "",
-      description: r.description_raw ? String(r.description_raw).slice(0, 4000) : "",
-      screenshots: Array.isArray(r.screenshots) ? r.screenshots.map(function (s) { return s.image; }).filter(Boolean).slice(0, 4) : [],
-      rawgUrl: r.slug ? "https://rawg.io/games/" + r.slug : "",
+      gdbId: j.id != null ? String(j.id) : null,
+      gdbUrl: j.url || (j.slug ? "https://www.igdb.com/games/" + j.slug : ""),
+      name: String(j.name || "Sin título").slice(0, 120),
+      imageUrl: banner,
+      coverUrl: cover,
+      rating: typeof j.rating === "number" ? Math.round((j.rating / 20) * 10) / 10 : null,
+      metacritic: typeof j.aggregated_rating === "number" ? Math.round(j.aggregated_rating) : null,
+      released: released,
+      genres: (Array.isArray(j.genres) ? j.genres : []).map(function (g) { return g && g.name; }).filter(Boolean).slice(0, 5),
+      platforms: (Array.isArray(j.platforms) ? j.platforms : []).map(String).slice(0, 8), // IDs → resolver al pintar
+      developer: developer,
+      pegi: pegi,
+      website: "",
+      description: String(j.summary || j.storyline || "").slice(0, 4000),
+      screenshots: (Array.isArray(j.screenshots) ? j.screenshots : []).slice(0, 4).map(function (s) { return s && s.url ? igdbImg(s.url, "screenshot_med") : null; }).filter(Boolean),
     };
   }
 
-  function addRawgGame(r, extraSources) {
-    var dup = (gamesCache || []).find(function (g) { return g.rawgId != null && String(g.rawgId) === String(r.id); });
+  function addGdbGame(j, extraSources) {
+    var dup = (gamesCache || []).find(function (g) { return g.gdbId != null && String(g.gdbId) === String(j.id); });
     if (dup) return dup;
-    var d = mapRawg(r);
+    var d = mapGameDB(j);
     var rec = {
       id: "g" + Date.now() + Math.random().toString(36).slice(2, 6),
-      name: d.name, imageUrl: d.imageUrl, rating: d.rating, metacritic: d.metacritic,
-      released: d.released, genres: d.genres, platforms: d.platforms, website: d.website,
-      description: d.description, screenshots: d.screenshots, rawgId: d.rawgId, rawgUrl: d.rawgUrl,
+      name: d.name, imageUrl: d.imageUrl, coverUrl: d.coverUrl, rating: d.rating, metacritic: d.metacritic,
+      released: d.released, genres: d.genres, platforms: d.platforms, developer: d.developer, pegi: d.pegi,
+      website: d.website, description: d.description, screenshots: d.screenshots, gdbId: d.gdbId, gdbUrl: d.gdbUrl,
       status: "backlog", addedAt: Date.now(), sources: (extraSources || []).slice(),
     };
     gamesCache.push(rec);
@@ -306,37 +369,36 @@
     var idx = api.getIndexes().find(function (i) { return i.name === game.source; });
     var rec = {
       id: "m" + Date.now() + Math.random().toString(36).slice(2, 6),
-      name: name.slice(0, 120), imageUrl: "", rating: null, metacritic: null,
-      released: "", genres: [], platforms: [], website: "", description: "", screenshots: [],
-      rawgId: null, rawgUrl: "", status: "backlog", addedAt: Date.now(),
+      name: name.slice(0, 120), imageUrl: "", coverUrl: "", rating: null, metacritic: null,
+      released: "", genres: [], platforms: [], developer: "", pegi: null, website: "", description: "", screenshots: [],
+      gdbId: null, gdbUrl: "", status: "backlog", addedAt: Date.now(),
       sources: game.link ? [{ indexId: idx ? idx.id : null, sourceName: game.source || "", itemTitle: name, itemLink: game.link }] : [],
     };
     gamesCache.push(rec);
     saveGames();
     api.showToast("Añadido a GameVault", "success");
     if (state.view === "library") rerender();
-    // Enriquecimiento async con RAWG si hay key: banner + descripción
-    getSettings(function () {}).then(function (settings) {
-      if (!settings.rawgKey) return;
-      return rawgFetch("games", { search: name, page_size: "1" }).then(function (json) {
-        var hit = json && Array.isArray(json.results) ? json.results[0] : null;
-        if (!hit) return;
-        return rawgDetail(hit.id).then(function (d) {
-          var cur = findGame(rec.id);
-          if (!cur) return;
-          var mapped = mapRawg(d);
-          cur.rawgId = mapped.rawgId; cur.imageUrl = mapped.imageUrl || cur.imageUrl;
-          cur.rating = mapped.rating; cur.metacritic = mapped.metacritic; cur.released = mapped.released;
-          cur.genres = mapped.genres; cur.platforms = mapped.platforms; cur.website = mapped.website;
-          cur.description = mapped.description; cur.screenshots = mapped.screenshots; cur.rawgUrl = mapped.rawgUrl;
-          saveGames();
-          rerender();
-        });
+    // Enriquecimiento async con GameDB: banner, ficha completa
+    gdbSearch(name).then(function (hits) {
+      if (!hits.length) return;
+      return gdbGame(hits[0].id).then(function (j) {
+        if (!j) return;
+        var cur = findGame(rec.id);
+        if (!cur) return;
+        var mapped = mapGameDB(j);
+        cur.gdbId = mapped.gdbId; cur.gdbUrl = mapped.gdbUrl; cur.imageUrl = mapped.imageUrl || cur.imageUrl;
+        cur.coverUrl = mapped.coverUrl || cur.coverUrl;
+        cur.rating = mapped.rating; cur.metacritic = mapped.metacritic; cur.released = mapped.released;
+        cur.genres = mapped.genres; cur.platforms = mapped.platforms; cur.developer = mapped.developer;
+        cur.pegi = mapped.pegi;
+        cur.description = mapped.description; cur.screenshots = mapped.screenshots;
+        saveGames();
+        rerender();
       });
     }).catch(function () { /* sin key o fallo de red: queda manual */ });
   }
 
-  // Añadido manual (sin RAWG): título obligatorio, imagen y descripción opcionales
+  // Añadido manual: título obligatorio, imagen y descripción opcionales
   function addManualGame(name, imageUrl, description) {
     var rec = {
       id: "m" + Date.now() + Math.random().toString(36).slice(2, 6),
@@ -344,7 +406,7 @@
       imageUrl: String(imageUrl || "").trim(),
       rating: null, metacritic: null, released: "", genres: [], platforms: [],
       website: "", description: String(description || "").trim().slice(0, 4000),
-      screenshots: [], rawgId: null, rawgUrl: "",
+      screenshots: [], gdbId: null, gdbUrl: "",
       status: "backlog", addedAt: Date.now(), sources: [],
     };
     gamesCache.push(rec);
@@ -403,19 +465,24 @@
       ".gv-input:focus{border-color:#24344f;box-shadow:0 0 0 3px rgba(14,165,233,0.08)}",
       ".gv-input.box{border-radius:10px}",
       ".gv-select{background:#070a12;border:1px solid #1e293b;border-radius:999px;color:#94a3b8;font-size:11.5px;padding:8px 26px 8px 12px;cursor:pointer;appearance:none}",
-      ".gv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:12px;overflow:auto}",
-      ".gv-card{background:#070a12;border:1px solid #1e293b;border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .15s;display:flex;flex-direction:column}",
-      ".gv-card:hover{border-color:#24344f;transform:translateY(-2px)}",
-      ".gv-card-img{height:108px;width:100%;object-fit:cover;display:block;background:#0d1528;flex-shrink:0}",
-      ".gv-card-ph{height:108px;width:100%;display:grid;place-items:center;font-size:26px;font-weight:700;color:rgba(255,255,255,0.55);text-shadow:0 2px 8px rgba(0,0,0,0.4)}",
-      ".gv-card-body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:4px}",
-      ".gv-card-name{font-size:12.5px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+      ".gv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;overflow:auto}",
+      ".gv-card{background:#070a12;border:1px solid #1e293b;border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color .18s,transform .18s,box-shadow .18s;display:flex;flex-direction:column}",
+      ".gv-card:hover{border-color:rgba(14,165,233,0.45);transform:translateY(-3px) scale(1.015);box-shadow:0 10px 26px rgba(0,0,0,0.4)}",
+      ".gv-poster-wrap{position:relative;overflow:hidden;background:#0d1528}",
+      ".gv-poster{width:100%;aspect-ratio:184/258;object-fit:cover;display:block;transition:transform .25s ease}",
+      ".gv-card:hover .gv-poster{transform:scale(1.05)}",
+      ".gv-poster-ph{width:100%;aspect-ratio:184/258;display:grid;place-items:center;font-size:34px;font-weight:700;color:rgba(255,255,255,0.55);text-shadow:0 2px 8px rgba(0,0,0,0.4)}",
+      ".gv-badge-overlay{position:absolute;top:8px;left:8px;z-index:1;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}",
+      ".gv-card-body{padding:8px 10px 10px;display:flex;flex-direction:column;gap:3px}",
+      ".gv-card-name{font-size:12px;font-weight:600;color:#e2e8f0;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}",
       ".gv-card-meta{font-size:10.5px;color:#64748b;display:flex;gap:6px;align-items:center;flex-wrap:wrap}",
       ".gv-badge{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;border:1px solid;width:max-content}",
       ".gv-banner{width:100%;height:210px;object-fit:cover;border-radius:12px;background:#0d1528;display:block;flex-shrink:0}",
       ".gv-meta-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}",
       ".gv-tag{font-size:10px;font-weight:500;padding:3px 9px;border:1px solid #1e293b;border-radius:999px;color:#94a3b8;background:#0f141e}",
       ".gv-desc{font-size:12.5px;color:#cbd5e1;line-height:1.65;white-space:pre-wrap;max-height:230px;overflow:auto;background:#070a12;border:1px solid #1e293b;border-radius:10px;padding:12px 14px}",
+      ".gv-caption{margin:0;font-size:11.5px;color:#94a3b8}",
+      ".gv-cover{width:120px;border-radius:10px;display:block;background:#0d1528;box-shadow:0 6px 18px rgba(0,0,0,0.35);flex-shrink:0}",
       ".gv-shots{display:flex;gap:8px;overflow-x:auto}",
       ".gv-shots img{height:74px;border-radius:8px;cursor:pointer;background:#0d1528;flex-shrink:0}",
       ".gv-section{display:flex;flex-direction:column;gap:10px}",
@@ -438,7 +505,7 @@
       ".gv-help{font-size:11px;color:#64748b;line-height:1.6;background:#070a12;border:1px solid #1e293b;border-radius:10px;padding:12px 14px}",
       ".gv-help code{font-family:var(--font-mono,monospace);color:#7dd3fc;font-size:10.5px}",
       ".gv-help a{color:#7dd3fc}",
-      "@media (max-width:640px){.gv-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}.gv-banner{height:150px}}",
+      "@media (max-width:640px){.gv-grid{grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px}.gv-banner{height:150px}}",
     ].join("\n");
     document.head.appendChild(s);
   }
@@ -462,6 +529,26 @@
     return ph;
   }
 
+  // Carátula vertical (estantería): prefiere coverUrl de IGDB, cae a imageUrl y a placeholder
+  function posterPh(game) {
+    var ph = el("div", "gv-poster-ph", (game.name || "?").charAt(0).toUpperCase());
+    ph.style.background = gradientFor(game.name);
+    return ph;
+  }
+  function posterEl(game) {
+    var url = game.coverUrl || game.imageUrl;
+    if (url) {
+      var img = document.createElement("img");
+      img.className = "gv-poster";
+      img.src = url;
+      img.alt = "";
+      img.loading = "lazy";
+      img.addEventListener("error", function () { img.replaceWith(posterPh(game)); });
+      return img;
+    }
+    return posterPh(game);
+  }
+
   function statusBadge(statusId, extraCls) {
     var st = statusOf(statusId);
     var b = el("span", "gv-badge" + (extraCls ? " " + extraCls : ""), st.label);
@@ -473,19 +560,37 @@
 
   // ---------- vistas ----------
 
+  // Token de render: las vistas que pueblan el DOM tras Promises asíncronas
+  // el DOM cuando la Promise resuelve. Si mientras tanto se re-renderizó (cambio de
+  // vista, updateApp del host…), su callback estaría pintando sobre DOM viejo o
+  // pisando otra vista → las vistas salían vacías. Cada render invalida al anterior.
+  var renderToken = 0;
+
   function renderPage(root) {
     ensureStyles();
     pageRoot = root;
     root.innerHTML = "";
+    var token = ++renderToken;
+    var done = false;
     ensureGames(function () {
+      if (token !== renderToken || done) return; // render obsoleto
+      done = true;
       var page = el("div", "gv-page");
       root.appendChild(page);
-      if (state.view === "search") renderSearch(page);
-      else if (state.view === "detail") renderDetail(page);
-      else if (state.view === "picker") renderPicker(page);
-      else if (state.view === "amatch") renderAMatch(page);
-      else if (state.view === "settings") renderSettings(page);
-      else renderLibrary(page);
+      try {
+        if (state.view === "search") renderSearch(page);
+        else if (state.view === "detail") renderDetail(page);
+        else if (state.view === "picker") renderPicker(page);
+        else if (state.view === "amatch") renderAMatch(page);
+        else if (state.view === "settings") renderSettings(page);
+        else renderLibrary(page);
+      } catch (err) {
+        console.error("[GameVault] render", err);
+        page.innerHTML = "";
+        var box = el("div", "gv-empty");
+        box.textContent = "Error al pintar la vista: " + (err && err.message ? err.message : err);
+        page.appendChild(box);
+      }
     });
   }
 
@@ -532,18 +637,6 @@
       { label: "＋ Añadir manual", onClick: function () { openManualAdd(); } },
       { label: "＋ Buscar juegos", primary: true, onClick: function () { state.searchQuery = ""; go("search"); } },
     ]);
-
-    getSettings(function () {}).then(function (settings) {
-      if (!settings.rawgKey) {
-        var note = el("div", "gv-banner-note");
-        note.appendChild(el("span", "", "Sin API key de RAWG: puedes añadir juegos a mano y gestionar fuentes. Con key gratis obtienes búsqueda, banners, ratings y descripciones."));
-        var b = el("button", "gv-btn", "Configurar RAWG");
-        b.type = "button";
-        b.addEventListener("click", function () { go("settings"); });
-        note.appendChild(b);
-        page.appendChild(note);
-      }
-    }).catch(function () {});
 
     var tools = el("div", "gv-head");
     var input = el("input", "gv-input");
@@ -602,23 +695,28 @@
         empty.style.gridColumn = "1/-1";
         empty.innerHTML = games.length
           ? "Nada coincide con el filtro."
-          : "Tu vault está vacía.<br>Busca juegos en RAWG o añádelos a mano.";
+          : "Tu vault está vacía.<br>Busca juegos o añádelos a mano.";
         listWrap.appendChild(empty);
         return;
       }
       list.forEach(function (g) {
         var card = el("div", "gv-card");
-        card.appendChild(coverEl(g, "gv-card-img"));
+        var posterWrap = el("div", "gv-poster-wrap");
+        posterWrap.appendChild(posterEl(g));
+        var badge = statusBadge(g.status);
+        badge.classList.add("gv-badge-overlay");
+        badge.style.background = "rgba(7,10,18,0.62)";
+        posterWrap.appendChild(badge);
+        card.appendChild(posterWrap);
         var body = el("div", "gv-card-body");
         body.appendChild(el("div", "gv-card-name", g.name));
         var meta = el("div", "gv-card-meta");
-        meta.appendChild(statusBadge(g.status));
         var bits = [];
         if (g.released) bits.push(fmtDate(g.released).slice(3));
         if (g.rating != null) bits.push("★ " + g.rating);
         if (g.sources && g.sources.length) bits.push(g.sources.length === 1 ? "1 fuente" : g.sources.length + " fuentes");
         if (bits.length) meta.appendChild(el("span", "", bits.join(" · ")));
-        body.appendChild(meta);
+        if (meta.children.length) body.appendChild(meta);
         card.appendChild(body);
         card.addEventListener("click", function () {
           state.gameId = g.id;
@@ -635,109 +733,108 @@
       { label: "← Volver", onClick: function () { go("library"); } },
     ]);
 
-    getSettings(function () {}).then(function (settings) {
-      if (!settings.rawgKey) {
-        var note = el("div", "gv-banner-note");
-        note.appendChild(el("span", "", "Necesitas una API key gratuita de RAWG para buscar."));
-        var b = el("button", "gv-btn gv-btn-primary", "Configurar");
-        b.type = "button";
-        b.addEventListener("click", function () { go("settings"); });
-        note.appendChild(b);
-        page.appendChild(note);
-        return;
-      }
-      var tools = el("div", "gv-head");
-      var input = el("input", "gv-input");
-      input.type = "text";
-      input.placeholder = "Ej: elden ring, zelda, hollow knight…";
-      input.value = state.searchQuery;
-      input.style.flex = "1 1 220px";
-      input.addEventListener("keydown", function (e) { if (e.key === "Enter") doSearch(); });
-      tools.appendChild(input);
-      var goBtn = el("button", "gv-btn gv-btn-primary", "Buscar");
-      goBtn.type = "button";
-      goBtn.addEventListener("click", doSearch);
-      tools.appendChild(goBtn);
-      page.appendChild(tools);
-      var status = el("div", "gv-head");
-      status.appendChild(el("small", "", state.searchQuery ? "Pulsa Buscar para repetir la consulta." : "La búsqueda consume cuota de tu key (20.000/mes)."));
-      page.appendChild(status);
-      page.appendChild(resultsEl);
-      if (state.searchQuery) doSearch();
-
-      function doSearch() {
-        var q = input.value.trim();
-        state.searchQuery = q;
-        resultsEl.innerHTML = "";
-        if (!q) return;
-        status.innerHTML = "";
-        status.appendChild(el("small", "", "Buscando «" + q + "» en RAWG…"));
-        rawgFetch("games", { search: q, page_size: "20" }).then(function (json) {
-          status.innerHTML = "";
-          var results = (json && json.results) || [];
-          if (!results.length) {
-            status.appendChild(el("small", "", "Sin resultados en RAWG."));
-            return;
-          }
-          status.appendChild(el("small", "", results.length + " resultados"));
-          results.forEach(function (r) {
-            var mapped = mapRawg(r);
-            var inVault = (gamesCache || []).some(function (g) { return g.rawgId != null && String(g.rawgId) === String(mapped.rawgId); });
-            var row = el("div", "gv-res-row");
-            if (mapped.imageUrl) {
-              var img = document.createElement("img");
-              img.className = "gv-res-img"; img.src = mapped.imageUrl; img.alt = ""; img.loading = "lazy";
-              row.appendChild(img);
-            } else {
-              var ph = el("div", "gv-res-img");
-              ph.style.display = "grid"; ph.style.placeItems = "center";
-              ph.style.background = gradientFor(mapped.name);
-              ph.textContent = mapped.name.charAt(0).toUpperCase();
-              row.appendChild(ph);
-            }
-            var info = el("div", "gv-res-info");
-            info.appendChild(el("strong", "", mapped.name));
-            var bits = [];
-            if (mapped.released) bits.push(fmtDate(mapped.released));
-            if (mapped.rating != null) bits.push("★ " + mapped.rating);
-            if (mapped.metacritic != null) bits.push("MC " + mapped.metacritic);
-            if (mapped.genres.length) bits.push(mapped.genres.slice(0, 2).join(", "));
-            if (bits.length) info.appendChild(el("small", "", bits.join(" · ")));
-            row.appendChild(info);
-            if (mapped.rawgUrl) {
-              var ext = el("button", "gv-btn", "RAWG ↗");
-              ext.type = "button";
-              ext.addEventListener("click", function () { api.openLink(mapped.rawgUrl); });
-              row.appendChild(ext);
-            }
-            var add = el("button", inVault ? "gv-btn" : "gv-btn gv-btn-primary", inVault ? "✓ En vault" : "＋ Añadir");
-            add.type = "button";
-            if (inVault) add.disabled = true;
-            else add.addEventListener("click", function () {
-              add.disabled = true; add.textContent = "Añadiendo…";
-              rawgDetail(mapped.rawgId).then(function (d) {
-                addRawgGame(d, []);
-                add.textContent = "✓ En vault";
-                api.showToast("«" + mapped.name + "» añadido a la vault", "success");
-              }).catch(function (err) {
-                // sin detalle igualmente se añade con lo que ya hay del search
-                addRawgGame(r, []);
-                add.textContent = "✓ En vault";
-                api.showToast("Añadido (sin detalle: " + err.message + ")", "warning", 5000);
-              });
-            });
-            row.appendChild(add);
-            resultsEl.appendChild(row);
-          });
-        }).catch(function (err) {
-          status.innerHTML = "";
-          status.appendChild(el("small", "", "Error: " + err.message));
-        });
-      }
-    }).catch(function () {});
-
     var resultsEl = el("div", "gv-results");
-    // (resultsEl se engancha dentro de getSettings si hay key)
+    var seq = 0; // invalida búsquedas obsoletas si el usuario repite rápido
+
+    var tools = el("div", "gv-head");
+    var input = el("input", "gv-input");
+    input.type = "text";
+    input.placeholder = "Ej: elden ring, zelda, hollow knight…";
+    input.value = state.searchQuery;
+    input.style.flex = "1 1 220px";
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") doSearch(); });
+    tools.appendChild(input);
+    var goBtn = el("button", "gv-btn gv-btn-primary", "Buscar");
+    goBtn.type = "button";
+    goBtn.addEventListener("click", doSearch);
+    tools.appendChild(goBtn);
+    page.appendChild(tools);
+    var status = el("div", "gv-head");
+    status.appendChild(el("small", "", "Búsqueda sobre GameDB (374.000+ juegos de IGDB). Sin claves ni cuotas."));
+    page.appendChild(status);
+    page.appendChild(resultsEl);
+    if (state.searchQuery) doSearch();
+
+    function rowFor(j) {
+      var mapped = mapGameDB(j);
+      var inVault = mapped.gdbId != null && (gamesCache || []).some(function (g) { return g.gdbId != null && String(g.gdbId) === String(mapped.gdbId); });
+      var row = el("div", "gv-res-row");
+      if (mapped.imageUrl) {
+        var img = document.createElement("img");
+        img.className = "gv-res-img"; img.src = mapped.imageUrl; img.alt = ""; img.loading = "lazy";
+        row.appendChild(img);
+      } else {
+        var ph = el("div", "gv-res-img");
+        ph.style.display = "grid"; ph.style.placeItems = "center";
+        ph.style.background = gradientFor(mapped.name);
+        ph.textContent = mapped.name.charAt(0).toUpperCase();
+        row.appendChild(ph);
+      }
+      var info = el("div", "gv-res-info");
+      info.appendChild(el("strong", "", mapped.name));
+      var bits = [];
+      if (mapped.released) bits.push(fmtDate(mapped.released));
+      if (mapped.rating != null) bits.push("★ " + mapped.rating);
+      if (mapped.metacritic != null) bits.push("MC " + mapped.metacritic);
+      if (mapped.developer) bits.push(mapped.developer);
+      if (mapped.genres.length) bits.push(mapped.genres.slice(0, 2).join(", "));
+      if (bits.length) info.appendChild(el("small", "", bits.join(" · ")));
+      row.appendChild(info);
+      if (mapped.gdbUrl) {
+        var ext = el("button", "gv-btn", "IGDB ↗");
+        ext.type = "button";
+        ext.addEventListener("click", function () { api.openLink(mapped.gdbUrl); });
+        row.appendChild(ext);
+      }
+      var add = el("button", inVault ? "gv-btn" : "gv-btn gv-btn-primary", inVault ? "✓ En vault" : "＋ Añadir");
+      add.type = "button";
+      if (inVault) add.disabled = true;
+      else add.addEventListener("click", function () {
+        add.disabled = true; add.textContent = "Añadiendo…";
+        var finish = function (detail) {
+          addGdbGame(detail, []);
+          add.textContent = "✓ En vault";
+          api.showToast("«" + mapped.name + "» añadido a la vault", "success");
+        };
+        if (j.summary != null) finish(j);
+        else gdbGame(mapped.gdbId).then(finish).catch(function () { finish(j); });
+      });
+      row.appendChild(add);
+      resultsEl.appendChild(row);
+    }
+
+    function doSearch() {
+      var q = input.value.trim();
+      state.searchQuery = q;
+      var mySeq = ++seq;
+      resultsEl.innerHTML = "";
+      if (!q) { status.innerHTML = ""; status.appendChild(el("small", "", "Escribe un término y pulsa Buscar.")); return; }
+      status.innerHTML = "";
+      status.appendChild(el("small", "", "Buscando «" + q + "» en GameDB…"));
+      gdbSearch(q).then(function (hits) {
+        if (mySeq !== seq) return; // búsqueda obsoleta
+        status.innerHTML = "";
+        if (!hits.length) {
+          status.appendChild(el("small", "", "Sin resultados en GameDB. Prueba con menos palabras."));
+          return;
+        }
+        // Los buckets solo traen {id, name}: enriquecemos las 12 primeras fichas en
+        // paralelo para mostrar banner/año/rating (las demás quedan como lista de nombres).
+        status.appendChild(el("small", "", hits.length + " resultados"));
+        var top = hits.slice(0, 12).map(function (h) {
+          return gdbGame(h.id).then(function (j) { return j || { id: h.id, name: h.name, url: "" }; }).catch(function () { return { id: h.id, name: h.name, url: "" }; });
+        });
+        return Promise.all(top).then(function (details) {
+          if (mySeq !== seq) return; // búsqueda obsoleta
+          details.forEach(function (j) { rowFor(j); });
+          hits.slice(12).forEach(function (h) { rowFor({ id: h.id, name: h.name, url: "" }); });
+        });
+      }).catch(function (err) {
+        if (mySeq !== seq) return;
+        status.innerHTML = "";
+        status.appendChild(el("small", "", "Error: " + err.message));
+      });
+    }
   }
 
   function renderDetail(page) {
@@ -764,15 +861,45 @@
       } },
     ]);
 
-    page.appendChild(coverEl(g, "gv-banner"));
+    // Banner horizontal + cover vertical (carátula IGDB) lado a lado
+    var hero = el("div", "gv-head");
+    hero.style.alignItems = "stretch";
+    hero.appendChild(coverEl(g, "gv-banner"));
+    if (g.coverUrl) {
+      var coverWrap = el("div");
+      coverWrap.style.cssText = "flex-shrink:0;width:120px";
+      var cv = document.createElement("img");
+      cv.className = "gv-cover";
+      cv.src = g.coverUrl;
+      cv.alt = "";
+      cv.loading = "lazy";
+      cv.style.cssText = "width:120px;border-radius:10px;display:block;background:#0d1528";
+      coverWrap.appendChild(cv);
+      hero.appendChild(coverWrap);
+    }
+    page.appendChild(hero);
 
     var meta = el("div", "gv-meta-row");
     meta.appendChild(statusBadge(g.status));
     if (g.rating != null) { var r = el("span", "gv-tag", "★ " + g.rating); meta.appendChild(r); }
     if (g.metacritic != null) { var mc = el("span", "gv-tag", "Metacritic " + g.metacritic); meta.appendChild(mc); }
     if (g.released) { var rl = el("span", "gv-tag", fmtDate(g.released)); meta.appendChild(rl); }
+    if (g.pegi) { var pg = el("span", "gv-tag", "PEGI " + g.pegi); meta.appendChild(pg); }
     (g.genres || []).slice(0, 4).forEach(function (gn) { meta.appendChild(el("span", "gv-tag", gn)); });
     page.appendChild(meta);
+    if (g.developer) {
+      page.appendChild(el("p", "gv-caption", "Desarrollado por " + g.developer));
+    }
+    if ((g.platforms || []).length) {
+      var platRow = el("div", "gv-meta-row");
+      gdbPlatforms().then(function (map) {
+        if (!platRow.isConnected) return;
+        (g.platforms || []).slice(0, 6).forEach(function (pid) {
+          platRow.appendChild(el("span", "gv-tag", map[pid] || ("Plataforma " + pid)));
+        });
+      }).catch(function () {});
+      page.appendChild(platRow);
+    }
 
     // Selector de estado
     var stRow = el("div", "gv-head");
@@ -791,18 +918,24 @@
     if (g.description) {
       var desc = el("div", "gv-desc", g.description);
       page.appendChild(desc);
-    } else if (g.rawgId) {
+    } else if (g.gdbId) {
       // Enriquecimiento perezoso: el juego se añadió sin detalle
-      rawgDetail(g.rawgId).then(function (d) {
-        var mapped = mapRawg(d);
+      gdbGame(g.gdbId).then(function (d) {
+        if (!d) return;
+        var mapped = mapGameDB(d);
         var cur = findGame(g.id);
         if (!cur) return;
         cur.description = mapped.description || cur.description;
         cur.genres = mapped.genres.length ? mapped.genres : cur.genres;
         cur.platforms = mapped.platforms.length ? mapped.platforms : cur.platforms;
-        cur.website = mapped.website || cur.website;
+        cur.developer = mapped.developer || cur.developer;
+        cur.pegi = cur.pegi || mapped.pegi;
         cur.screenshots = mapped.screenshots.length ? mapped.screenshots : cur.screenshots;
         cur.imageUrl = mapped.imageUrl || cur.imageUrl;
+        cur.coverUrl = mapped.coverUrl || cur.coverUrl;
+        cur.rating = cur.rating || mapped.rating;
+        cur.metacritic = cur.metacritic || mapped.metacritic;
+        cur.released = cur.released || mapped.released;
         saveGames();
         if (state.view === "detail" && state.gameId === g.id) rerender();
       }).catch(function () {});
@@ -825,7 +958,7 @@
       page.appendChild(shots);
     }
 
-    if (g.website || g.rawgUrl) {
+    if (g.website || g.gdbUrl) {
       var links = el("div", "gv-head");
       if (g.website) {
         var w = el("button", "gv-btn", "Web oficial ↗");
@@ -833,10 +966,10 @@
         w.addEventListener("click", function () { api.openLink(g.website); });
         links.appendChild(w);
       }
-      if (g.rawgUrl) {
-        var rg = el("button", "gv-btn", "Ver en RAWG ↗");
+      if (g.gdbUrl) {
+        var rg = el("button", "gv-btn", "Ver en IGDB ↗");
         rg.type = "button";
-        rg.addEventListener("click", function () { api.openLink(g.rawgUrl); });
+        rg.addEventListener("click", function () { api.openLink(g.gdbUrl); });
         links.appendChild(rg);
       }
       page.appendChild(links);
@@ -1070,7 +1203,7 @@
     ]);
 
     var help = el("div", "gv-help");
-    help.innerHTML = "Escanea los títulos de una fuente, los busca en RAWG y te deja <strong>confirmar cada juego</strong> antes de añadirlo con su banner y ficha. Si el juego ya está en la vault, puedes fusionar la fuente. Consume 1 petición de tu cuota por título (tope 60, de 3 en 3).";
+    help.innerHTML = "Escanea los títulos de una fuente, los busca en GameDB (IGDB) y te deja <strong>confirmar cada juego</strong> antes de añadirlo con su carátula y ficha. Si el juego ya está en la vault, se fusiona la fuente. Descarga 1 ficha por juego al confirmar.";
     page.appendChild(help);
 
     // Selección de índice + botón escanear
@@ -1094,13 +1227,10 @@
     scan.addEventListener("click", function () {
       var ix = indexes.find(function (i) { return i.id === am.indexId; });
       if (!ix) { api.showToast("Elige una fuente primero", "warning"); return; }
-      getSettings(function () {}).then(function (settings) {
-        if (!settings.rawgKey) { api.showToast("Configura tu API key de RAWG primero", "warning"); go("settings"); return; }
-        am.items = amatchBuildItems(ix);
-        if (!am.items.length) { api.showToast("Nada nuevo que escanear en esa fuente", "info"); return; }
-        amatchRun();
-        rerender();
-      }).catch(function () {});
+      am.items = amatchBuildItems(ix);
+      if (!am.items.length) { api.showToast("Nada nuevo que escanear en esa fuente", "info"); return; }
+      amatchRun();
+      rerender();
     });
     tools.appendChild(scan);
     var prog = el("small", "", "");
@@ -1109,6 +1239,7 @@
     tools.appendChild(el("span", "gv-spacer"));
     var confirmBtn = el("button", "gv-btn gv-btn-primary", "Añadir seleccionados");
     confirmBtn.type = "button";
+    confirmBtn.id = "gv-am-confirm";
     confirmBtn.addEventListener("click", amatchConfirm);
     tools.appendChild(confirmBtn);
     page.appendChild(tools);
@@ -1161,73 +1292,22 @@
       { label: "← Volver", onClick: function () { go("library"); } },
     ]);
 
-    getSettings(function () {}).then(function (settings) {
+    {
       var box = el("div", "gv-section");
       box.style.background = "#0a0f1c";
       box.style.border = "1px solid #1e293b";
       box.style.borderRadius = "12px";
       box.style.padding = "16px";
 
-      var f1 = el("label", "gv-field");
-      f1.appendChild(el("span", "", "API key de RAWG (gratis)"));
-      var keyInput = el("input", "gv-input box");
-      keyInput.type = "text";
-      keyInput.placeholder = "Pega aquí tu key de rawg.io";
-      keyInput.value = settings.rawgKey || "";
-      f1.appendChild(keyInput);
-      box.appendChild(f1);
+      var st = el("div", "gv-head");
+      st.appendChild(el("h4", "", "Fuente de datos"));
+      page.appendChild(st);
 
-      var actions = el("div", "gv-head");
-      var save = el("button", "gv-btn gv-btn-primary", "Guardar");
-      save.type = "button";
-      save.addEventListener("click", function () {
-        settings.rawgKey = keyInput.value.trim();
-        api.storage.set("gv_settings", settings).then(function () {
-          api.showToast("Ajustes guardados", "success");
-        }).catch(function () {
-          api.showToast("Error al guardar", "error");
-        });
-      });
-      actions.appendChild(save);
-
-      var test = el("button", "gv-btn", "Probar conexión");
-      test.type = "button";
-      var testOut = el("small", "", "");
-      test.addEventListener("click", function () {
-        var key = keyInput.value.trim();
-        if (!key) { testOut.textContent = "Introduce una key primero."; testOut.style.color = "#fbbf24"; return; }
-        test.disabled = true; testOut.textContent = "Probando…"; testOut.style.color = "";
-        var ctrl = new AbortController();
-        var timer = setTimeout(function () { ctrl.abort(); }, 15000);
-        fetch(RAWG_BASE + "games?key=" + encodeURIComponent(key) + "&page_size=1", { signal: ctrl.signal })
-          .then(function (res) {
-            clearTimeout(timer);
-            if (res.status === 401) throw new Error("key no válida");
-            if (res.status === 429) throw new Error("límite alcanzado");
-            if (!res.ok) throw new Error("HTTP " + res.status);
-            return res.json();
-          })
-          .then(function (json) {
-            testOut.textContent = "Conexión OK — RAWG respondió " + ((json.results || []).length ? "con resultados" : "correctamente") + ".";
-            testOut.style.color = "#4ade80";
-          })
-          .catch(function (err) {
-            clearTimeout(timer);
-            testOut.textContent = "Fallo: " + (err.name === "AbortError" ? "timeout" : err.message) + ".";
-            testOut.style.color = "#f87171";
-          })
-          .finally(function () { test.disabled = false; });
-      });
-      actions.appendChild(test);
-      actions.appendChild(testOut);
-      box.appendChild(actions);
-
-      var help = el("div", "gv-help");
-      help.innerHTML = "1. Crea una cuenta gratis en <a href=\"https://rawg.io/apidocs\" target=\"_blank\" rel=\"noopener\">rawg.io/apidocs</a> y consigue tu key.<br>" +
-        "2. Pégala arriba y guarda. La key se queda en tu navegador y solo se envía a <code>api.rawg.io</code>.<br>" +
-        "3. Sin key, GameVault sigue funcionando: añade juegos a mano (con imagen por URL) y gestiona sus fuentes.<br>" +
-        "Límite del plan gratis: 20.000 peticiones/mes — GameVault solo llama a RAWG al buscar y al añadir.";
-      box.appendChild(help);
+      var src = el("div", "gv-help");
+      src.innerHTML = "<strong style=\"color:#4ade80\">✓ Sin configuración</strong> — GameVault usa <a href=\"https://github.com/LizardByte/GameDB\" target=\"_blank\" rel=\"noopener\">GameDB</a>," +
+        " una copia pública de la base de datos de IGDB publicada por LizardByte como JSON estático (374.000+ juegos, actualizada a diario).<br>" +
+        "No hay claves, ni cuotas, ni cuentas: la búsqueda, carátulas y fichas funcionan desde el primer momento. Solo se consultan <code>app.lizardbyte.dev</code> e <code>images.igdb.com</code>.";
+      box.appendChild(src);
       page.appendChild(box);
 
       // Estadísticas de la vault
@@ -1332,12 +1412,12 @@
                   gamesCache = list.map(function (x) {
                     return {
                       id: String(x.id || ("m" + Date.now() + Math.random().toString(36).slice(2, 6))),
-                      name: String(x.name).slice(0, 120), imageUrl: x.imageUrl || "",
+                      name: String(x.name).slice(0, 120), imageUrl: x.imageUrl || "", coverUrl: x.coverUrl || "",
                       rating: x.rating != null ? x.rating : null, metacritic: x.metacritic != null ? x.metacritic : null,
                       released: x.released || "", genres: Array.isArray(x.genres) ? x.genres : [],
-                      platforms: Array.isArray(x.platforms) ? x.platforms : [], website: x.website || "",
-                      description: x.description || "", screenshots: Array.isArray(x.screenshots) ? x.screenshots : [],
-                      rawgId: x.rawgId != null ? String(x.rawgId) : null, rawgUrl: x.rawgUrl || "",
+                      platforms: Array.isArray(x.platforms) ? x.platforms : [], developer: x.developer || "", pegi: x.pegi || null,
+                      website: x.website || "", description: x.description || "", screenshots: Array.isArray(x.screenshots) ? x.screenshots : [],
+                      gdbId: x.gdbId != null ? String(x.gdbId) : (x.rawgId != null ? String(x.rawgId) : null), gdbUrl: x.gdbUrl || x.rawgUrl || "",
                       status: STATUSES.some(function (s) { return s.id === x.status; }) ? x.status : "backlog",
                       addedAt: x.addedAt || Date.now(),
                       sources: Array.isArray(x.sources) ? x.sources.filter(function (s2) { return s2 && typeof s2 === "object"; }) : [],
@@ -1358,7 +1438,7 @@
       brow.appendChild(imp);
       bk.appendChild(brow);
       page.appendChild(bk);
-    }).catch(function () {});
+    }
   }
 
   IndexLy.register({
@@ -1368,7 +1448,7 @@
       ensureGames(function () {});
       ctx.addSection({ id: "gamevault", label: "GameVault", render: renderPage });
       // Botón en los resultados de búsqueda de IndexLy: añade el título a la vault
-      // con ese item como primera fuente (si RAWG tiene key, lo enriquece luego).
+      // con ese item como primera fuente (GameDB lo enriquece en segundo plano).
       ctx.addCardAction({
         id: "gv-add",
         label: "＋ Vault",
