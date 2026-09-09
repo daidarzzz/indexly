@@ -1655,11 +1655,19 @@
       return json;
     } finally { clearTimeout(timer); }
   }
-  async function fetchHubJson(url) {
+  async function fetchHubJson(url, noStore) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 25000);
     try {
-      const res = await fetch(url, { signal: ctrl.signal, headers: { accept: "application/json, application/gzip, */*" } });
+      const headers = { accept: "application/json, application/gzip, */*" };
+      const opts = { signal: ctrl.signal, headers };
+      if (noStore) {
+        // Descargas de actualización: nunca contenido cacheado (navegador ni CDN)
+        opts.cache = "no-store";
+        headers["Cache-Control"] = "no-cache";
+        headers.Pragma = "no-cache";
+      }
+      const res = await fetch(url, opts);
       if (!res.ok) throw new Error(`Descarga falló (HTTP ${res.status})`);
       const blob = await res.blob();
       const text = await decompressBlobToText(blob);
@@ -1828,11 +1836,20 @@
 
   // Descarga el contenido crudo de un paquete del Hub (inline o vía R2),
   // descomprime y parsea. Compartida por importar, instalar y actualizar.
-  async function fetchHubPackageRaw(slug) {
+  async function fetchHubPackageRaw(slug, bust) {
     const r = await hubFetch(`/packages/${encodeURIComponent(slug)}/raw`);
     const d = r.data || {};
     let rawData = d.rawData;
-    if (d.r2_url && rawData === undefined) rawData = await fetchHubJson(d.r2_url);
+    if (d.r2_url && rawData === undefined) {
+      let fileUrl = d.r2_url;
+      // Si la clave R2 es estable entre versiones, el navegador/CDN puede servir
+      // el objeto viejo: se añade la versión remota como buster (las URLs
+      // públicas de R2 ignoran el query extra).
+      try {
+        if (bust) fileUrl += (fileUrl.includes("?") ? "&" : "?") + "v=" + encodeURIComponent(String(bust));
+      } catch {}
+      rawData = await fetchHubJson(fileUrl, true);
+    }
     if (rawData === undefined) throw new Error("Paquete sin contenido");
     return { data: d, rawData };
   }
@@ -1842,7 +1859,7 @@
     const meta = hubSeen.get(slug) || { slug, name: slug };
     showToast(`Importando "${meta.name || slug}"…`, "info");
     try {
-      const { data: d, rawData } = await fetchHubPackageRaw(slug);
+      const { data: d, rawData } = await fetchHubPackageRaw(slug, meta.version);
       const outerPkg = { slug, name: String(meta.name || slug).slice(0, 100), version: meta.version || null, r2Url: d.r2_url || null };
       let entries;
       if (isV2Envelope(rawData)) {
@@ -1869,7 +1886,7 @@
     const meta = hubSeen.get(slug) || { slug, name: slug };
     showToast(`Descargando plugin "${meta.name || slug}"…`, "info");
     try {
-      const { rawData } = await fetchHubPackageRaw(slug);
+      const { rawData } = await fetchHubPackageRaw(slug, meta.version);
       const pl = rawData && typeof rawData === "object" ? rawData.plugin : null;
       if (!pl || typeof pl !== "object") throw new Error("El paquete no es un plugin (falta { plugin: {…} })");
       if (!pl.id || typeof pl.code !== "string" || !pl.code.trim()) throw new Error("Manifiesto sin id o sin código");
@@ -2078,9 +2095,9 @@
     const group = indexes.filter(i => i.pkg && i.pkg.slug === slug);
     if (!group.length) throw new Error("El paquete ya no está instalado");
     const label = group[0].pkg.name || slug;
-    const { data: d, rawData } = await fetchHubPackageRaw(slug);
-    const meta = hubSeen.get(slug) || {};
     const row = updatesRows.find(r => r.type === "pkg" && r.slug === slug);
+    const { data: d, rawData } = await fetchHubPackageRaw(slug, row && row.remoteV);
+    const meta = hubSeen.get(slug) || {};
     const outerPkg = { slug, name: String(meta.name || label).slice(0, 100), version: (row && row.remoteV) || meta.version || null, r2Url: d.r2_url || null };
     let entries;
     if (isV2Envelope(rawData)) {
@@ -2190,7 +2207,8 @@
     const p = installedPlugins.find(x => x.hubSlug === slug)
       || installedPlugins.find(x => String(x.name || "").toLowerCase() === String((hubSeen.get(slug) || {}).name || "").toLowerCase());
     if (!p) throw new Error(`Plugin "${slug}" no instalado`);
-    const { rawData } = await fetchHubPackageRaw(slug);
+    const row = updatesRows.find(r => r.type === "plugin" && r.slug === slug);
+    const { rawData } = await fetchHubPackageRaw(slug, row && row.remoteV);
     const pl = rawData && typeof rawData === "object" ? rawData.plugin : null;
     if (!pl || typeof pl !== "object") throw new Error("El paquete no es un plugin (falta { plugin: {…} })");
     if (!pl.id || typeof pl.code !== "string" || !pl.code.trim()) throw new Error("Manifiesto sin id o sin código");
