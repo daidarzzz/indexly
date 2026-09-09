@@ -2204,10 +2204,13 @@
   // silent=true lo integra en la actualización masiva (solo muta el rec; el
   // llamador persiste y recarga). Fuera del masivo: confirma, guarda y recarga.
   async function hubUpdatePlugin(slug, silent) {
-    const p = installedPlugins.find(x => x.hubSlug === slug)
-      || installedPlugins.find(x => String(x.name || "").toLowerCase() === String((hubSeen.get(slug) || {}).name || "").toLowerCase());
-    if (!p) throw new Error(`Plugin "${slug}" no instalado`);
+    // La fila de Actualizar ya trae el id exacto del plugin instalado (vale para
+    // copias del Hub y de fichero/URL); solo como fallback se usa hubSlug/nombre.
     const row = updatesRows.find(r => r.type === "plugin" && r.slug === slug);
+    const p = (row && row.id && installedPlugins.find(x => x.id === row.id))
+      || installedPlugins.find(x => x.hubSlug === slug)
+      || installedPlugins.find(x => String(x.name || "").toLowerCase() === String((hubSeen.get(slug) || {}).name || "").toLowerCase());
+    if (!p) throw new Error(`Plugin "${slug}" no instalado (¿lo borraste o lo instalaste con otro nombre? Reinstálalo desde el Hub o desde fichero)`);
     const { rawData } = await fetchHubPackageRaw(slug, row && row.remoteV);
     const pl = rawData && typeof rawData === "object" ? rawData.plugin : null;
     if (!pl || typeof pl !== "object") throw new Error("El paquete no es un plugin (falta { plugin: {…} })");
