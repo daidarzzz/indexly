@@ -1,7 +1,7 @@
 /* IndexLy Plugin
    id: readly
    name: ReadLy
-    version: 1.5.0
+    version: 1.6.0
    description: Tu biblioteca de libros dentro de IndexLy: añade tus EPUB, PDF y TXT, léalos en un lector a pantalla completa con temas, índice de capítulos y progreso guardado por página. La carátula se extrae del propio EPUB; ficha automática de Google Books como complemento. Todo local.
    permissions: network, ui, storage
 */
@@ -411,7 +411,10 @@
       ".lib-tools-toggle:hover{opacity:1}",
       ".lib-reader.lib-tools-hidden .lib-reader-tools{display:none}",
       ".lib-reader-body{flex:1;min-height:0;position:relative;overflow:hidden}",
-      ".lib-reader-view{position:absolute;inset:0}",
+      ".lib-reader-view{position:absolute;inset:0;touch-action:pan-y;will-change:transform}",
+      ".lib-swipe-anim{transition:transform .24s cubic-bezier(.2,.7,.3,1)}",
+      ".lib-swipe-drag{cursor:grabbing}",
+      "@media (prefers-reduced-motion:reduce){.lib-swipe-anim{transition:none}}",
       ".lib-reader-bottom{display:flex;align-items:center;gap:12px;padding:8px 16px;border-top:1px solid #1e293b;background:#0a0f1c;flex-shrink:0}",
       ".lib-track{flex:1;height:4px;border-radius:999px;background:#141b29;overflow:hidden}",
       ".lib-track span{display:block;height:100%;background:#a78bfa;border-radius:999px;transition:width .2s}",
@@ -436,6 +439,7 @@
       "@media (hover:none) and (pointer:coarse){.lib-tapzone{display:block}.lib-nav-arrow{display:flex}.lib-hide-nav{display:inline-flex!important}}",
       ".lib-reader.is-touch .lib-tapzone{display:block}",
       ".lib-reader.is-touch .lib-nav-arrow{display:flex}",
+      ".lib-reader.lib-nav-hidden .lib-tapzone{top:0;bottom:0;width:30%}",
       ".lib-pdfframe{width:100%;height:100%;border:0;background:#14161c}",
       "@keyframes libFadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}",
       ".lib-detail{display:flex;flex-direction:column;gap:16px;animation:libFadeUp .35s ease both}",
@@ -1252,6 +1256,7 @@
   function closeReader() {
     if (!reader) return;
     var wasBookId = reader.bookId;
+    if (reader.swipeDetach) { try { reader.swipeDetach(); } catch (e) { /* noop */ } }
     // Guarda el progreso final antes de destruir nada (el debounce puede perderlo)
     if (reader.lastProgress) {
       var cur = findBook(wasBookId);
@@ -1402,10 +1407,13 @@
       try { localStorage.setItem("readly_tools_hidden", reader.toolsHidden ? "1" : "0"); } catch (e) {}
       reader.paintTools();
     });
-    // Flechas de movimiento: quitar/poner (persistente por libro)
+    // Flechas de movimiento: quitar/poner (persistente por libro). El toque en los
+    // bordes para pasar página sigue activo aunque se oculten las flechas.
     reader.applyNavPref = function () {
       var hide = !!reader.navHidden;
-      [tapL, tapR, arrL, arrR].forEach(function (n) { if (n) n.style.display = hide ? "none" : ""; });
+      [tapL, tapR].forEach(function (n) { if (n) n.style.display = ""; });
+      [arrL, arrR].forEach(function (n) { if (n) n.style.display = hide ? "none" : ""; });
+      overlay.classList.toggle("lib-nav-hidden", hide);
       hideNav.textContent = hide ? "Con flechas" : "Sin flechas";
     };
     hideNav.addEventListener("click", function () {
@@ -1566,6 +1574,19 @@
       tocBtn.type = "button";
       ui.tools.appendChild(tocBtn);
 
+      var swipeBtn = el("button", "lib-btn" + (swipeOn(book) ? " lib-btn-primary" : ""), "Deslizar");
+      swipeBtn.type = "button";
+      swipeBtn.title = "Pasar página deslizando (dedo o ratón)";
+      swipeBtn.setAttribute("aria-label", "Activar o desactivar el deslizamiento para pasar página");
+      swipeBtn.addEventListener("click", function () {
+        var cur = findBook(book.id);
+        var on = !(cur ? swipeOn(cur) : swipeOn(book));
+        reader.swipeOn = on;
+        swipeBtn.classList.toggle("lib-btn-primary", on);
+        if (cur) { cur.swipe = on; saveBooks(); }
+      });
+      ui.tools.appendChild(swipeBtn);
+
       // TOC
       var toc = el("div", "lib-toc");
       reader.body.appendChild(toc);
@@ -1606,6 +1627,7 @@
     // Re-mide al girar el móvil o redimensionar la ventana (rotación incluida)
     var resizeHandler = function () {
       if (!reader || !reader.rendition) return;
+      if (reader.swipeCancel) { try { reader.swipeCancel(); } catch (e) {} }
       var s2 = size();
       try { reader.rendition.resize(s2.w, s2.h); } catch {}
     };
@@ -1684,6 +1706,10 @@
     }
     reader.navHidden = !!book.hideNav;
     if (reader.applyNavPref) reader.applyNavPref();
+    // Swipe para pasar página (conmutador en ajustes; el gesto se ignora si está off)
+    if (typeof reader.swipeOn !== "boolean") reader.swipeOn = swipeOn(book);
+    if (reader.swipeDetach) { try { reader.swipeDetach(); } catch (e) {} reader.swipeDetach = null; reader.swipeCancel = null; }
+    attachSwipeNav(book, rendition, view);
     var startTarget = startCFI || undefined;
     (startTarget ? rendition.display(startTarget) : rendition.display()).then(function () {
       if (book.progress && book.progress.percentage) setProgress(book.progress.percentage, book.progress.chapter || "");
@@ -1694,9 +1720,201 @@
     return rendition;
   }
 
+  // ---------- swipe: pasar página deslizando (dedo o ratón) con transición ----------
+  // La página sigue al puntero en vivo; al soltar, la actual sale deslizándose y la
+  // nueva entra desde el lado correspondiente. El contenido vive en un iframe, así que
+  // los gestos se capturan dentro de cada documento vía hooks.content.
+
+  function swipeOn(book) { return !book || book.swipe !== false; }
+
+  function reducedMotion() {
+    try { return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch (e) { return false; }
+  }
+
+  function attachSwipeNav(book, rendition, view) {
+    var st = { pid: null, sx: 0, sy: 0, dx: 0, t0: 0, locked: false, vertical: false, anim: false, ateUntil: 0, edge: null, w: 0 };
+    function width() {
+      try {
+        var r = view.getBoundingClientRect();
+        if (r && r.width) return Math.floor(r.width);
+      } catch (e) {}
+      return window.innerWidth || 300;
+    }
+    function setX(px, animate) {
+      if (animate && !reducedMotion()) view.classList.add("lib-swipe-anim");
+      else view.classList.remove("lib-swipe-anim");
+      view.style.transform = px ? ("translate3d(" + Math.round(px) + "px,0,0)") : "";
+    }
+    function afterTransition(ms) {
+      return new Promise(function (res) {
+        var done = false;
+        function fin() {
+          if (done) return; done = true;
+          try { view.removeEventListener("transitionend", fin); } catch (e) {}
+          res();
+        }
+        try { view.addEventListener("transitionend", fin); } catch (e) {}
+        setTimeout(fin, (ms || 240) + 140);
+      });
+    }
+    function nextRelocated(timeout) {
+      return new Promise(function (res) {
+        var done = false, t = null;
+        function fin() {
+          if (done) return; done = true;
+          try { rendition.off("relocated", fin); } catch (e) {}
+          if (t) clearTimeout(t);
+          res();
+        }
+        try { rendition.on("relocated", fin); }
+        catch (e) { res(); return; }
+        t = setTimeout(fin, timeout || 900);
+      });
+    }
+    function userSelect(doc, val) {
+      try { if (doc && doc.documentElement) doc.documentElement.style.userSelect = val || ""; } catch (e) {}
+    }
+    function endDrag(doc) {
+      st.pid = null; st.locked = false; st.vertical = false;
+      try { view.classList.remove("lib-swipe-drag"); } catch (e) {}
+      userSelect(doc, "");
+    }
+    function cancelDrag(snap) {
+      if (st.pid == null && !st.anim) return;
+      st.pid = null; st.locked = false; st.vertical = false;
+      try { view.classList.remove("lib-swipe-drag"); } catch (e) {}
+      if (snap !== false) setX(0, true);
+      st.dx = 0;
+    }
+    reader.swipeDetach = function () {
+      cancelDrag(false);
+      setX(0, false);
+      try { view.classList.remove("lib-swipe-drag"); view.classList.remove("lib-swipe-anim"); } catch (e) {}
+    };
+    reader.swipeCancel = function () { cancelDrag(true); };
+
+    function onDown(e) {
+      if (!reader || reader.swipeOn === false || st.anim) return;
+      if (st.pid != null) return; // un solo puntero
+      try { if (e.pointerType === "mouse" && e.button !== 0) return; } catch (err) {}
+      var x = e.clientX, y = e.clientY;
+      if (typeof x !== "number") return;
+      st.pid = e.pointerId;
+      st.sx = x; st.sy = y; st.dx = 0;
+      st.t0 = Date.now();
+      st.locked = false; st.vertical = false;
+      st.w = width();
+      try {
+        var loc = rendition.currentLocation && rendition.currentLocation();
+        st.edge = { start: !!(loc && loc.atStart), end: !!(loc && loc.atEnd) };
+      } catch (err) { st.edge = { start: false, end: false }; }
+    }
+    function onMove(e) {
+      if (e.pointerId !== st.pid || st.anim) return;
+      if (st.vertical) return;
+      var dx = e.clientX - st.sx, dy = e.clientY - st.sy;
+      if (!st.locked) {
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        if (Math.abs(dy) > Math.abs(dx) * 1.2) { st.vertical = true; st.pid = null; return; } // scroll vertical: no interferir
+        st.locked = true;
+        try { view.classList.add("lib-swipe-drag"); } catch (err) {}
+        try {
+          var d = (e.view && e.view.document) || null;
+          if (d && d.getSelection) d.getSelection().removeAllRanges();
+          userSelect(d, "none");
+        } catch (err) {}
+      }
+      // Resistencia elástica en los bordes del libro
+      var rdx = dx;
+      if ((dx > 0 && st.edge && st.edge.start) || (dx < 0 && st.edge && st.edge.end)) rdx = dx * 0.35;
+      st.dx = rdx;
+      setX(rdx, false);
+      try { e.preventDefault(); } catch (err) {}
+    }
+    function onUp(e) {
+      if (e.pointerId !== st.pid) return;
+      var doc = null;
+      try { doc = (e.view && e.view.document) || null; } catch (err) {}
+      var wasLocked = st.locked, dx = st.dx, dt = Math.max(1, Date.now() - st.t0);
+      endDrag(doc);
+      if (!wasLocked) { st.dx = 0; return; } // fue un tap: lo gestionan tapzones/enlaces
+      st.ateUntil = Date.now() + 400; // suprime el click posterior al arrastre
+      var w = st.w || width();
+      var vel = dx / dt;
+      var thr = Math.max(72, w * 0.22);
+      var dir = dx < 0 ? "next" : "prev";
+      var blocked = (dir === "next" && st.edge && st.edge.end) || (dir === "prev" && st.edge && st.edge.start);
+      st.dx = 0;
+      if (blocked || !(Math.abs(dx) > thr || (Math.abs(vel) > 0.55 && Math.abs(dx) > 24))) {
+        setX(0, true); // rebote elástico
+        return;
+      }
+      navigate(dir, w);
+    }
+    function onCancel(e) {
+      if (e.pointerId !== st.pid) return;
+      var doc = null;
+      try { doc = (e.view && e.view.document) || null; } catch (err) {}
+      endDrag(doc);
+      setX(0, true);
+      st.dx = 0;
+    }
+    function navigate(dir, w) {
+      if (st.anim) return;
+      if (reducedMotion()) {
+        try { if (dir === "next") rendition.next(); else rendition.prev(); } catch (e) {}
+        setX(0, false);
+        return;
+      }
+      st.anim = true;
+      var outX = dir === "next" ? -w : w;
+      setX(outX, true);
+      afterTransition(240).then(function () {
+        if (!reader || reader.rendition !== rendition) return null;
+        var p = nextRelocated(900);
+        try { if (dir === "next") rendition.next(); else rendition.prev(); } catch (e) {}
+        return p;
+      }).then(function (ok) {
+        if (ok == null || !reader || reader.rendition !== rendition) return null;
+        view.classList.remove("lib-swipe-anim");
+        view.style.transform = "translate3d(" + (dir === "next" ? w : -w) + "px,0,0)";
+        void view.offsetWidth; // reflow para que la transición de entrada se anime
+        view.classList.add("lib-swipe-anim");
+        view.style.transform = "translate3d(0,0,0)";
+        return afterTransition(240);
+      }).then(function () {
+        try { view.classList.remove("lib-swipe-anim"); } catch (e) {}
+        view.style.transform = "";
+        st.anim = false;
+      });
+    }
+    function wireDoc(d) {
+      if (!d || !d.documentElement || d.documentElement.__libSwipe) return;
+      d.documentElement.__libSwipe = true;
+      try { d.documentElement.style.touchAction = "pan-y"; } catch (e) {}
+      d.addEventListener("click", function (ev) {
+        if (Date.now() < st.ateUntil) { ev.preventDefault(); ev.stopPropagation(); }
+      }, true);
+      d.documentElement.addEventListener("pointerdown", onDown);
+      d.addEventListener("pointermove", onMove);
+      d.addEventListener("pointerup", onUp);
+      d.addEventListener("pointercancel", onCancel);
+    }
+    try {
+      rendition.hooks.content.register(function (contents) {
+        try {
+          var d = (contents && (contents.document || contents.doc)) ||
+            (contents && contents.window && contents.window.document) || null;
+          if (d) wireDoc(d);
+        } catch (e) {}
+      });
+    } catch (e) {}
+  }
+
   function setSpread(book, spread) {
     if (!reader || !reader.book) return;
     if (reader.spread === spread) return;
+    if (reader.swipeDetach) { try { reader.swipeDetach(); } catch (e) {} }
     reader.spread = spread;
     reader.spreadBtns();
     var cur = findBook(book.id);
@@ -1831,7 +2049,7 @@
             " gratis y sin claves; puedes rebuscarla desde la ficha.</li>" +
             "<li><strong>Leer</strong>: «Abrir libro» en la ficha o «Continuar (n%)». Dentro del" +
             " lector: índice de capítulos, tamaño de letra, temas claro/sépia/oscuro, barra de" +
-            " progreso y flechas del teclado (o espacio) para pasar página, y puedes elegir <strong>1 o 2 páginas</strong> por vista. El botón «···» oculta el panel de ajustes para leer sin distracciones, y en móvil «Sin flechas» quita las flechas de movimiento. Optimizado para móvil: barras compactas y botones táctiles. <kbd>Esc</kbd> cierra." +
+            " progreso y flechas del teclado (o espacio) para pasar página, y puedes elegir <strong>1 o 2 páginas</strong> por vista. El botón «···» oculta el panel de ajustes para leer sin distracciones, y en móvil «Sin flechas» oculta las flechas pero mantiene el toque en los bordes para pasar página. También puedes pasar página deslizando con el dedo o el ratón (botón «Deslizar»). Optimizado para móvil: barras compactas y botones táctiles. <kbd>Esc</kbd> cierra." +
             " La barra violeta bajo la carátula marca el progreso.</li>" +
             "<li><strong>Estados</strong>: Leyendo / Pendiente / Terminado / Abandonado, con filtros" +
             " en la biblioteca.</li>" +
