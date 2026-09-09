@@ -1,8 +1,8 @@
 /* IndexLy Plugin
    id: vistas
    name: Vistas+
-   version: 1.0.0
-   description: Sustituye el toggle de vista por un menú de 5 vistas: Lista, Compacta, Tabla, Cuadrícula y Pósters. Puro CSS sobre el render nativo de IndexLy (usa los propios botones list/grid del host), así que búsqueda, orden, paginación, badges y botones de otros plugins siguen funcionando en todas las vistas. Sin configuración.
+   version: 1.1.0
+   description: Sustituye el toggle de vista por un menú de 5 vistas: Lista, Compacta, Tabla, Cuadrícula y Pósters. Puro CSS sobre el render nativo de IndexLy (usa los propios botones list/grid del host), así que búsqueda, orden, paginación, badges y botones de otros plugins siguen funcionando en todas las vistas. Los Pósters llevan degradado aurora animado con destello sutil, conservando el color propio de cada resultado. Sin configuración.
    permissions: ui, storage
 */
 (function () {
@@ -26,6 +26,36 @@
 
   var current = "list";
   var searchSeq = 0;
+  var hueObserver = null;
+
+  // ---------- hidratación del hue por card ----------
+
+  // El host pinta cada cover con un gradiente inline determinista del título.
+  // Extraemos su hue y lo exponemos como --pl-h para que el CSS de pósters
+  // pueda teñir degradado, destello, borde y sombra con el color de cada card.
+  function hydrateHues(root) {
+    var scope = root || document.getElementById("results");
+    if (!scope || !scope.querySelectorAll) return;
+    var covers = scope.querySelectorAll(".grid-cover");
+    for (var i = 0; i < covers.length; i++) {
+      var c = covers[i];
+      if (c.getAttribute("data-plxv-h")) continue;
+      var m = /hsl\((\d+)/.exec(c.style.background || "");
+      if (!m) continue;
+      // En la card (no en el cover) para que borde y sombra de hover hereden el hue
+      var host = c.closest(".grid-card") || c;
+      host.style.setProperty("--pl-h", m[1]);
+      c.setAttribute("data-plxv-h", "1");
+    }
+  }
+
+  function ensureHueObserver() {
+    if (hueObserver || typeof MutationObserver === "undefined") return;
+    var results = document.getElementById("results");
+    if (!results) return;
+    hueObserver = new MutationObserver(function () { hydrateHues(); });
+    hueObserver.observe(results, { childList: true, subtree: true });
+  }
 
   function viewById(id) {
     for (var i = 0; i < VIEWS.length; i++) if (VIEWS[i].id === id) return VIEWS[i];
@@ -64,9 +94,21 @@
       "#results.plxv-table .game-meta { margin: 0; flex-shrink: 0; }",
       "#results.plxv-table .magnet-link, #results.plxv-table .no-magnet { opacity: 1; visibility: visible; transform: none; pointer-events: auto; }",
 
-      // Vista Pósters — escaparate con covers grandes
+      // Vista Pósters — escaparate con covers grandes y degradado "aurora".
+      // El hue por card (--pl-h) lo hidrata el JS a partir del gradiente inline
+      // nativo: cada póster conserva su color propio sin tocar el host.
       "#results.plxv-posters { gap: 14px; }",
-      "#results.plxv-posters .grid-cover { height: 190px; }",
+      "#results.plxv-posters .grid-cover { height: 190px; background: radial-gradient(120% 150% at 85% -10%, hsl(var(--pl-h, 210) 90% 60% / 0.55), transparent 55%), radial-gradient(120% 140% at 0% 110%, hsl(calc(var(--pl-h, 210) + 60) 75% 45% / 0.40), transparent 60%), linear-gradient(165deg, hsl(var(--pl-h, 210) 40% 13%), hsl(calc(var(--pl-h, 210) + 30) 50% 8%)) !important; transition: transform .35s ease; }",
+      "#results.plxv-posters .grid-card:hover .grid-cover { transform: scale(1.04); }",
+      // Destello sutil que cruza el cover en bucle (::before está libre en el host)
+      "#results.plxv-posters .grid-cover::before { content: \"\"; position: absolute; top: 0; bottom: 0; left: 0; width: 60%; background: linear-gradient(100deg, transparent, hsl(var(--pl-h, 210) 90% 80% / 0.12) 45%, hsl(calc(var(--pl-h, 210) + 40) 90% 85% / 0.10) 55%, transparent); filter: blur(6px); transform: translateX(-110%) skewX(-14deg); animation: plxv-sheen 9s ease-in-out infinite; pointer-events: none; }",
+      "@keyframes plxv-sheen { 0% { transform: translateX(-110%) skewX(-14deg); } 55%, 100% { transform: translateX(320%) skewX(-14deg); } }",
+      // En hover, glow superior teñido del hue (sustituye al patrón de puntos nativo)
+      "#results.plxv-posters .grid-cover::after { -webkit-mask-image: none; mask-image: none; background: radial-gradient(90% 70% at 50% 0%, hsl(var(--pl-h, 210) 80% 70% / 0.20), transparent 70%); opacity: 0; transition: opacity .35s ease; }",
+      "#results.plxv-posters .grid-card:hover .grid-cover::after { opacity: 1; }",
+      // Hover de la card: lift + sombra y borde teñidos del hue propio
+      "#results.plxv-posters .grid-card:hover { transform: translateY(-4px); border-color: hsl(var(--pl-h, 210) 60% 55% / 0.45); box-shadow: 0 18px 40px hsl(var(--pl-h, 210) 70% 28% / 0.35); }",
+      "@media (prefers-reduced-motion: reduce) { #results.plxv-posters .grid-cover::before { animation: none; display: none; } #results.plxv-posters .grid-card:hover, #results.plxv-posters .grid-card:hover .grid-cover { transform: none; } }",
       "#results.plxv-posters .grid-cover__initial { width: 56px; height: 56px; font-size: 24px; border-radius: 14px; }",
       "#results.plxv-posters .grid-body { gap: 8px; }",
       "#results.plxv-posters .grid-title { font-size: 15.5px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }",
@@ -104,6 +146,10 @@
     if (results) {
       results.classList.remove("plxv-dense", "plxv-table", "plxv-posters");
       if (v.cls) results.classList.add(v.cls);
+    }
+    if (v.cls === "plxv-posters") {
+      ensureHueObserver();
+      hydrateHues();
     }
     syncSegButtons();
     if (persist !== false) api.storage.set("view", v.id).catch(function () {});

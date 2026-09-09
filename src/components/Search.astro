@@ -80,6 +80,7 @@
           <button type="button" class="chip active" data-hubtab="popular">Populares</button>
           <button type="button" class="chip" data-hubtab="recent">Recientes</button>
           <button type="button" class="chip" data-hubtab="plugins">Plugins</button>
+          <button type="button" class="chip" data-hubtab="updates">Actualizar<span id="hub-upd-badge" class="hub-tab-badge" style="display:none" aria-hidden="true"></span></button>
           <button type="button" class="chip" data-hubtab="favs">Favoritos</button>
         </div>
         <input type="text" id="hub-search" class="mapping-input hub-search" placeholder="Buscar paquetes…" autocomplete="off" spellcheck="false" aria-label="Buscar paquetes en el Hub" />
@@ -1559,6 +1560,9 @@
     try { localStorage.removeItem("indexly_hub_token"); } catch {}
     hubCache.clear();
     hubSeen.clear();
+    updatesRows = [];
+    updatesCheckedAt = null;
+    renderUpdatesBadge();
     updateHubUI();
     if (!quiet) showToast("Desconectado del Hub", "info");
   }
@@ -1625,7 +1629,7 @@
       closeHubModal();
       updateHubUI();
       showToast("Conectado al Hub", "success");
-      hubLoad(true);
+      if (hubTab === "updates") checkUpdates(true); else hubLoad(true);
     } catch (err) {
       console.error(err);
       showToast(err.name === "AbortError" ? "El Hub no responde (timeout)" : err.message, "error", 5000);
@@ -1669,6 +1673,9 @@
     document.querySelectorAll("[data-hubtab]").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     hubTab = btn.dataset.hubtab;
+    // En "Actualizar" no aplican buscador ni paginación del explorador
+    hubSearch.style.display = hubTab === "updates" ? "none" : "";
+    if (hubTab === "updates") { checkUpdates(false); return; }
     hubLoad(true);
   }));
   hubSearch.addEventListener("input", debounce(() => { hubQuery = hubSearch.value.trim(); hubLoad(true); }, 350));
@@ -1714,6 +1721,8 @@
   }
   async function hubLoad(reset) {
     if (!hubToken || hubLoading) return;
+    // La pestaña Actualizar tiene su propio flujo (checkUpdates), no el explorador
+    if (hubTab === "updates") return;
     if (reset) hubPage = 1;
     const key = hubTab + "|" + hubQuery;
     if (reset) {
@@ -1815,16 +1824,23 @@
     finally { btn.disabled = false; }
   };
 
+  // Descarga el contenido crudo de un paquete del Hub (inline o vía R2),
+  // descomprime y parsea. Compartida por importar, instalar y actualizar.
+  async function fetchHubPackageRaw(slug) {
+    const r = await hubFetch(`/packages/${encodeURIComponent(slug)}/raw`);
+    const d = r.data || {};
+    let rawData = d.rawData;
+    if (d.r2_url && rawData === undefined) rawData = await fetchHubJson(d.r2_url);
+    if (rawData === undefined) throw new Error("Paquete sin contenido");
+    return { data: d, rawData };
+  }
+
   window.hubImport = async function(slug) {
     if (!hubToken) { openHubModal(); return; }
     const meta = hubSeen.get(slug) || { slug, name: slug };
     showToast(`Importando "${meta.name || slug}"…`, "info");
     try {
-      const r = await hubFetch(`/packages/${encodeURIComponent(slug)}/raw`);
-      const d = r.data || {};
-      let rawData = d.rawData;
-      if (d.r2_url && rawData === undefined) rawData = await fetchHubJson(d.r2_url);
-      if (rawData === undefined) throw new Error("Paquete sin contenido");
+      const { data: d, rawData } = await fetchHubPackageRaw(slug);
       const outerPkg = { slug, name: String(meta.name || slug).slice(0, 100), version: meta.version || null, r2Url: d.r2_url || null };
       let entries;
       if (isV2Envelope(rawData)) {
@@ -1851,11 +1867,7 @@
     const meta = hubSeen.get(slug) || { slug, name: slug };
     showToast(`Descargando plugin "${meta.name || slug}"…`, "info");
     try {
-      const r = await hubFetch(`/packages/${encodeURIComponent(slug)}/raw`);
-      const d = r.data || {};
-      let rawData = d.rawData;
-      if (d.r2_url && rawData === undefined) rawData = await fetchHubJson(d.r2_url);
-      if (rawData === undefined) throw new Error("Paquete sin contenido");
+      const { rawData } = await fetchHubPackageRaw(slug);
       const pl = rawData && typeof rawData === "object" ? rawData.plugin : null;
       if (!pl || typeof pl !== "object") throw new Error("El paquete no es un plugin (falta { plugin: {…} })");
       if (!pl.id || typeof pl.code !== "string" || !pl.code.trim()) throw new Error("Manifiesto sin id o sin código");
@@ -1873,7 +1885,7 @@
         `¿Instalar el plugin "${info.name}" v${info.version}? Ejecutará código con acceso a tus fuentes (solo lectura y añadir). Instala solo desde orígenes de confianza.${perms}`,
         async () => {
           try {
-            const rec = await installPluginFromManifest(info, pl.code);
+            const rec = await installPluginFromManifest(info, pl.code, slug);
             try { await hubFetch(`/packages/${encodeURIComponent(slug)}/download`, { method: "POST" }); } catch {}
             const stored = installedPlugins.find(p => p.id === rec.id);
             if (stored && stored._error) showToast(`Instalado pero falló al activar: ${stored._error}`, "error", 6000);
@@ -1888,6 +1900,311 @@
       showToast(`No se pudo instalar: ${err.message}`, "error", 5000);
     }
   };
+
+  // ---------- Actualizaciones (pestaña "Actualizar" del Hub) ----------
+
+  // Comparación semver numérica: >0 si a es mayor, <0 si b, 0 si iguales.
+  // Segmentos no numéricos caen a 0; null/ausente cuenta como -1 (lo más viejo).
+  function compareVersions(a, b) {
+    if (a == null && b == null) return 0;
+    if (a == null) return -1;
+    if (b == null) return 1;
+    const pa = String(a).split(/[.\-+]/).map(s => parseInt(s, 10) || 0);
+    const pb = String(b).split(/[.\-+]/).map(s => parseInt(s, 10) || 0);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      const d = (pa[i] || 0) - (pb[i] || 0);
+      if (d) return d;
+    }
+    return 0;
+  }
+
+  const UPD_MAX_PAGES = 4;
+
+  // Construye el mapa slug → meta de TODOS los paquetes del Hub (índices y
+  // plugins), paginando con tope. Usa el mismo fallback kind/tags que hubLoad.
+  async function fetchHubCatalog() {
+    const map = new Map();
+    const attempts = ["", "kind=plugin&", "tags=plugin&"];
+    for (const attempt of attempts) {
+      for (let page = 1; page <= UPD_MAX_PAGES; page++) {
+        let json;
+        try {
+          json = await hubFetch(`/packages?${attempt}sort=recent&page=${page}&pageSize=100`);
+        } catch (err) {
+          if (page === 1) break; // este intento no existe en el servidor → siguiente
+          throw err;
+        }
+        const items = json.data || [];
+        items.forEach(p => map.set(p.slug, p));
+        if (!(json.meta && json.meta.hasMore)) break;
+      }
+    }
+    return map;
+  }
+
+  // Filas de la pestaña Actualizar. Cada fila es un paquete local (grupo de
+  // fuentes con pkg.slug) o un plugin instalado desde el Hub.
+  function buildUpdateRows(catalog) {
+    const rows = [];
+    const seen = new Set();
+    // Paquetes de índices agrupados por slug
+    const groups = new Map();
+    indexes.forEach(i => {
+      if (!i.pkg || !i.pkg.slug) return;
+      if (!groups.has(i.pkg.slug)) groups.set(i.pkg.slug, { pkg: i.pkg, sources: [] });
+      groups.get(i.pkg.slug).sources.push(i);
+    });
+    groups.forEach((g, slug) => {
+      seen.add(slug);
+      const remote = catalog.get(slug);
+      const localV = g.pkg.version || null;
+      let status = "unknown";
+      if (!remote) status = "gone";
+      else if (localV == null) status = "unknown";
+      else if (compareVersions(remote.version, localV) > 0) status = "outdated";
+      else status = "ok";
+      rows.push({ type: "pkg", slug, name: (g.pkg.name || slug), localV, remoteV: remote ? (remote.version || null) : null, itemCount: remote ? remote.itemCount : null, sourceCount: g.sources.length, status });
+    });
+    // Plugins instalados desde el Hub (match por slug guardado; fallback nombre)
+    installedPlugins.forEach(p => {
+      let slug = p.hubSlug || null;
+      let remote = slug ? catalog.get(slug) : null;
+      if (!remote) {
+        for (const [s, meta] of catalog) {
+          if (meta && meta.kind === "plugin" && String(meta.name || "").toLowerCase() === String(p.name || "").toLowerCase()) { slug = s; remote = meta; break; }
+        }
+      }
+      if (!slug) return;
+      seen.add(slug);
+      const localV = p.version || null;
+      let status = "unknown";
+      if (!remote) status = "gone";
+      else if (compareVersions(remote.version, localV) > 0) status = "outdated";
+      else status = "ok";
+      rows.push({ type: "plugin", slug, id: p.id, name: p.name, localV, remoteV: remote ? (remote.version || null) : null, itemCount: null, status });
+    });
+    return rows;
+  }
+
+  let updatesRows = [];
+  let updatesLoading = false;
+  let updatesCheckedAt = null;
+
+  function countOutdated() {
+    return updatesRows.filter(r => r.status === "outdated").length;
+  }
+
+  function renderUpdatesBadge() {
+    const el = document.getElementById("hub-upd-badge");
+    if (!el) return;
+    const n = countOutdated();
+    el.textContent = n ? String(n) : "";
+    el.style.display = n ? "inline-flex" : "none";
+  }
+
+  async function checkUpdates(force) {
+    if (!hubToken) { openHubModal(); return; }
+    if (updatesLoading) return;
+    const key = "updates";
+    if (!force) {
+      const hit = hubCache.get(key);
+      if (hit && Date.now() - hit.at < HUB_CACHE_MS) { updatesRows = hit.rows; updatesCheckedAt = hit.at; renderUpdatesBadge(); renderUpdatesList(); return; }
+    }
+    updatesLoading = true;
+    renderUpdatesList();
+    try {
+      const catalog = await fetchHubCatalog();
+      updatesRows = buildUpdateRows(catalog);
+      updatesCheckedAt = Date.now();
+      hubCache.set(key, { rows: updatesRows, at: updatesCheckedAt });
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || "No se pudo comprobar actualizaciones", "error", 5000);
+    } finally {
+      updatesLoading = false;
+      renderUpdatesBadge();
+      renderUpdatesList();
+    }
+  }
+
+  function updStatusBadge(status) {
+    if (status === "outdated") return `<span class="upd-badge outdated">Desfasado</span>`;
+    if (status === "unknown") return `<span class="upd-badge unknown" title="No se guardó su versión al importar. Actualiza para registrarla.">¿Versión?</span>`;
+    if (status === "gone") return `<span class="upd-badge gone" title="Ya no existe en el Hub. Elimínalo desde Fuentes o reimpórtalo desde otra pestaña.">No en Hub</span>`;
+    return `<span class="upd-badge ok">Al día</span>`;
+  }
+
+  function renderUpdatesList() {
+    if (hubTab !== "updates") return;
+    hubMore.style.display = "none";
+    hubSearch.style.display = "none";
+    const bar = `
+      <div class="upd-bar">
+        <span class="upd-bar-info">${updatesCheckedAt ? `Comprobado ${new Date(updatesCheckedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
+        <button type="button" class="action-btn secondary" onclick="checkUpdates(true)" ${updatesLoading ? "disabled" : ""}>Comprobar de nuevo</button>
+        <button type="button" class="action-btn secondary upd-all" onclick="hubUpdateAll()" ${updatesLoading || !countOutdated() ? "disabled" : ""}>Actualizar todo (${countOutdated()})</button>
+      </div>`;
+    if (updatesLoading) { hubList.innerHTML = bar + `<p class="hub-loading">Comprobando actualizaciones…</p>`; return; }
+    if (!updatesRows.length) {
+      hubList.innerHTML = bar + `<p class="hub-empty">${indexes.some(i => i.pkg) || installedPlugins.some(p => p.hubSlug) ? "Todo al día." : "No tienes paquetes ni plugins del Hub instalados."}</p>`;
+      return;
+    }
+    const items = updatesRows.map(r => {
+      const versions = r.localV
+        ? `v${escapeHtml(r.localV)}${r.remoteV && r.remoteV !== r.localV ? ` → v${escapeHtml(r.remoteV)}` : ""}`
+        : (r.remoteV ? `versión desconocida → v${escapeHtml(r.remoteV)}` : "versión desconocida");
+      const sub = [versions, r.type === "pkg" ? `${r.sourceCount} fuente(s)` : "plugin", r.itemCount != null ? `${Number(r.itemCount).toLocaleString("es-ES")} elem.` : ""].filter(Boolean).join(" · ");
+      // "gone": no hay nada que descargar del Hub, solo informativo
+      const btn = r.status === "outdated" || r.status === "unknown"
+        ? `<button type="button" class="action-btn secondary" onclick="hubUpdateItem('${escapeHtml(r.type)}','${escapeHtml(r.slug)}')" ${updatesLoading ? "disabled" : ""}>Actualizar</button>`
+        : `<span class="upd-ok-mark" title="${r.status === "gone" ? "Elimínalo desde Fuentes" : "Sin cambios"}">${r.status === "gone" ? "—" : "✓"}</span>`;
+      return `<div class="io-item hub-item upd-item ${r.status}">`
+        + `<span class="io-item-dot" aria-hidden="true"></span>`
+        + `<span class="io-item-info"><strong>${escapeHtml(r.name)}</strong><small>${escapeHtml(sub)}</small></span>`
+        + `<span class="io-item-meta">${updStatusBadge(r.status)}${btn}</span></div>`;
+    }).join("");
+    hubList.innerHTML = bar + items;
+  }
+
+  // Trabajo real de reemplazo de un paquete (lanza errores). Sustituye rawData
+  // de fuentes existentes (mismo nombre), añade nuevas y elimina las que ya no
+  // vienen en la nueva versión. silent=true suprime el toast de éxito (masivo).
+  async function performPackageUpdate(slug, silent) {
+    const group = indexes.filter(i => i.pkg && i.pkg.slug === slug);
+    if (!group.length) throw new Error("El paquete ya no está instalado");
+    const label = group[0].pkg.name || slug;
+    const { data: d, rawData } = await fetchHubPackageRaw(slug);
+    const meta = hubSeen.get(slug) || {};
+    const row = updatesRows.find(r => r.type === "pkg" && r.slug === slug);
+    const outerPkg = { slug, name: String(meta.name || label).slice(0, 100), version: (row && row.remoteV) || meta.version || null, r2Url: d.r2_url || null };
+    let entries;
+    if (isV2Envelope(rawData)) {
+      entries = inflateIndexes(rawData)
+        .filter(it => it && it.rawData)
+        .map(it => ({ name: String(it.name || outerPkg.name), active: it.active ?? true, mapping: it.mapping || null, rawData: it.rawData, pkg: it.pkg || outerPkg }));
+    } else {
+      const mapping = (meta.indexly && meta.indexly.mapping) || null;
+      entries = [{ name: outerPkg.name, active: true, mapping, rawData, pkg: outerPkg }];
+    }
+    if (!entries.length) throw new Error("El paquete no contiene fuentes");
+    const localByName = new Map(group.map(i => [String(i.name).toLowerCase(), i]));
+    const nextNames = new Set(entries.map(e => String(e.name).toLowerCase()));
+    const removed = [];
+    group.forEach(i => { if (!nextNames.has(String(i.name).toLowerCase())) removed.push(i); });
+    let replaced = 0, added = 0;
+    for (const e of entries) {
+      const local = localByName.get(String(e.name).toLowerCase());
+      if (local) {
+        local.rawData = e.rawData;
+        local.pkg = { ...e.pkg };
+        try { local.games = normalizeJson(e.rawData, local.name, local.mapping || null); } catch { local.games = []; }
+        replaced++;
+      } else {
+        const parsed = normalizeJson(e.rawData, e.name, e.mapping || null);
+        indexes.push({ id: Date.now().toString() + Math.random().toString(36).substring(2, 7), name: e.name, active: e.active ?? true, rawData: e.rawData, mapping: e.mapping || null, pkg: e.pkg || outerPkg, games: parsed });
+        added++;
+        pluginRuntime.emit("source:added", { source: { name: e.name } });
+      }
+    }
+    if (removed.length) {
+      const rmIds = new Set(removed.map(i => i.id));
+      indexes = indexes.filter(i => !rmIds.has(i.id));
+      removed.forEach(i => pluginRuntime.emit("source:removed", { id: i.id, name: i.name }));
+    }
+    try { await hubFetch(`/packages/${encodeURIComponent(slug)}/download`, { method: "POST" }); } catch {}
+    await saveIndexesToStorage();
+    updateApp();
+    hubCache.delete("updates");
+    if (!silent) {
+      const parts = [`${replaced} actualizada(s)`];
+      if (added) parts.push(`${added} nueva(s)`);
+      if (removed.length) parts.push(`${removed.length} eliminada(s)`);
+      showToast(`"${label}": ${parts.join(", ")}`, "success", 5000);
+    }
+  }
+
+  window.hubUpdateItem = function(type, slug) {
+    if (type === "plugin") return hubUpdatePlugin(slug, false);
+    return hubUpdatePackage(slug, false);
+  };
+
+  async function hubUpdatePackage(slug, silent) {
+    const group = indexes.filter(i => i.pkg && i.pkg.slug === slug);
+    const label = group.length ? (group[0].pkg.name || slug) : slug;
+    if (silent) { await performPackageUpdate(slug, true); return; }
+    showConfirm(
+      `¿Actualizar el paquete "${label}"? Se reemplazará su contenido por la versión del Hub: las fuentes que ya no existan se eliminarán.`,
+      async () => {
+        try {
+          await performPackageUpdate(slug, false);
+          checkUpdates(false);
+        } catch (err) {
+          console.error(err);
+          showToast(`No se pudo actualizar: ${err.message}`, "error", 5000);
+        }
+      }
+    );
+  }
+
+  // Actualización masiva: procesa los desfasados en secuencia (evita 429).
+  // Si se actualizó algún plugin, persiste y recarga al final.
+  async function hubUpdateAll() {
+    if (updatesLoading) return;
+    const targets = updatesRows.filter(r => r.status === "outdated" || r.status === "unknown");
+    if (!targets.length) { showToast("Nada que actualizar", "info"); return; }
+    const btns = document.querySelectorAll("#hub-list .upd-bar .action-btn");
+    btns.forEach(b => { b.disabled = true; });
+    let ok = 0, fail = 0, pluginTouched = false;
+    for (const t of targets) {
+      try {
+        if (t.type === "plugin") { await hubUpdatePlugin(t.slug, true); pluginTouched = true; }
+        else await performPackageUpdate(t.slug, true);
+        ok++;
+      } catch (err) { console.error(err); fail++; }
+    }
+    if (pluginTouched) {
+      try { await saveStoredPlugins(installedPlugins); } catch {}
+      showToast(`Actualización masiva: ${ok} ok${fail ? `, ${fail} con error` : ""}. Recargando…`, fail ? "warning" : "success", 2500);
+      setTimeout(() => location.reload(), 1200);
+      return;
+    }
+    btns.forEach(b => { b.disabled = false; });
+    renderUpdatesBadge();
+    renderUpdatesList();
+    checkUpdates(false);
+    showToast(`Actualización masiva: ${ok} ok${fail ? `, ${fail} con error` : ""}`, fail ? "warning" : "success", 5000);
+  }
+
+  window.checkUpdates = checkUpdates;
+  window.hubUpdateAll = hubUpdateAll;
+
+  // Actualiza un plugin del Hub: sustituye código/versión conservando enabled.
+  // silent=true lo integra en la actualización masiva (solo muta el rec; el
+  // llamador persiste y recarga). Fuera del masivo: confirma, guarda y recarga.
+  async function hubUpdatePlugin(slug, silent) {
+    const p = installedPlugins.find(x => x.hubSlug === slug)
+      || installedPlugins.find(x => String(x.name || "").toLowerCase() === String((hubSeen.get(slug) || {}).name || "").toLowerCase());
+    if (!p) throw new Error(`Plugin "${slug}" no instalado`);
+    const { rawData } = await fetchHubPackageRaw(slug);
+    const pl = rawData && typeof rawData === "object" ? rawData.plugin : null;
+    if (!pl || typeof pl !== "object") throw new Error("El paquete no es un plugin (falta { plugin: {…} })");
+    if (!pl.id || typeof pl.code !== "string" || !pl.code.trim()) throw new Error("Manifiesto sin id o sin código");
+    if (pl.id !== p.id) throw new Error(`El plugin del Hub (${pl.id}) no coincide con el instalado (${p.id})`);
+    if (pluginCodeBytes(pl.code) > MAX_PLUGIN_BYTES) throw new Error(`El código supera ${Math.round(MAX_PLUGIN_BYTES / 1024)} KB`);
+    try { compilePlugin(pl.code); } catch (err) { throw new Error("Sintaxis inválida: " + err.message); }
+    const apply = () => {
+      p.code = pl.code;
+      p.version = String(pl.version || "1.0.0").slice(0, 20);
+      p.description = String(pl.description || "");
+      p.hubSlug = slug;
+    };
+    if (silent) { apply(); return; }
+    showConfirm(`¿Actualizar el plugin "${p.name}" a v${String(pl.version || "1.0.0")}? Se recargará la página.`, async () => {
+      apply();
+      try { await saveStoredPlugins(installedPlugins); } catch (err) { showToast(`No se pudo guardar: ${err.message}`, "error"); return; }
+      location.reload();
+    });
+  }
 
   // Deep-link del Hub (?import=<url>&name=<slug>&mapping=<json>): descarga y abre el modal de importación normal.
   async function handleHubImport() {
@@ -2313,7 +2630,7 @@
   // Instala y activa un plugin desde un manifiesto válido. Usada por el modal
   // de instalación (fichero/URL) y por el flujo del Hub (hubInstallPlugin).
   // IMPORTANTE: persistir ANTES de activar — activateAll() re-lee desde IndexedDB.
-  async function installPluginFromManifest(m, code) {
+  async function installPluginFromManifest(m, code, hubSlug) {
     if (!m || !m.id) throw new Error("Manifiesto sin id");
     if (installedPlugins.some(p => p.id === m.id)) throw new Error(`Ya existe un plugin con el id "${m.id}". Elimínalo primero.`);
     const rec = {
@@ -2321,6 +2638,7 @@
       permissions: Array.isArray(m.permissions) ? m.permissions.map(String) : [],
       description: String(m.description || ""),
       code, enabled: true, installedAt: Date.now(),
+      hubSlug: hubSlug ? String(hubSlug) : null,
     };
     installedPlugins.push(rec);
     try {
@@ -2759,6 +3077,18 @@
   :global(.hub-item .action-btn.secondary:hover) { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-border-strong); }
   :global(.hub-item .action-btn.map) { min-height: 26px; padding: 6px; }
   :global(.hub-star.on) { color: var(--color-primary); border-color: var(--color-primary-border); background: var(--color-primary-soft); }
+  /* Pestaña Actualizar — runtime renderiza via innerHTML, de ahí el :global */
+  .hub-tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 15px; height: 15px; margin-left: 5px; padding: 0 4px; border-radius: 999px; background: var(--color-primary); color: #fff; font-size: 9.5px; font-weight: 700; font-family: var(--font-mono); line-height: 1; vertical-align: 1px; }
+  :global(.upd-bar) { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: var(--space-2); }
+  :global(.upd-bar-info) { font-size: 11px; color: var(--color-text-tertiary); margin-right: auto; }
+  :global(.upd-bar .action-btn.secondary) { display: inline-flex; align-items: center; min-height: 26px; white-space: nowrap; }
+  :global(.upd-bar .action-btn:disabled) { opacity: 0.45; cursor: not-allowed; }
+  :global(.upd-badge) { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; font-family: var(--font-mono); padding: 3px 8px; border-radius: 999px; border: 1px solid var(--color-border); color: var(--color-text-tertiary); white-space: nowrap; }
+  :global(.upd-badge.ok) { color: #4ade80; border-color: rgba(74,222,128,0.25); background: rgba(74,222,128,0.07); }
+  :global(.upd-badge.outdated) { color: #fbbf24; border-color: rgba(251,191,36,0.3); background: rgba(251,191,36,0.07); }
+  :global(.upd-badge.unknown) { color: var(--color-text-tertiary); border-style: dashed; }
+  :global(.upd-badge.gone) { color: #f87171; border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.07); }
+  :global(.upd-ok-mark) { color: #4ade80; font-size: 13px; padding: 0 6px; }
   .hub-loading, .hub-empty { font-size: var(--text-sm); color: var(--color-text-tertiary); text-align: center; margin: var(--space-4) 0 var(--space-2); }
   .hub-error { font-size: var(--text-sm); color: #f87171; text-align: center; margin: var(--space-4) 0 var(--space-2); }
   #hub-more { margin-left: auto; margin-right: auto; }
