@@ -2038,11 +2038,14 @@
     if (hubTab !== "updates") return;
     hubMore.style.display = "none";
     hubSearch.style.display = "none";
+    const nOut = countOutdated();
     const bar = `
       <div class="upd-bar">
         <span class="upd-bar-info">${updatesCheckedAt ? `Comprobado ${new Date(updatesCheckedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
-        <button type="button" class="action-btn secondary" onclick="checkUpdates(true)" ${updatesLoading ? "disabled" : ""}>Comprobar de nuevo</button>
-        <button type="button" class="action-btn secondary upd-all" onclick="hubUpdateAll()" ${updatesLoading || !countOutdated() ? "disabled" : ""}>Actualizar todo (${countOutdated()})</button>
+        <span class="upd-bar-actions">
+          <button type="button" class="action-btn secondary" onclick="checkUpdates(true)" ${updatesLoading ? "disabled" : ""}>Comprobar de nuevo</button>
+          ${nOut ? `<button type="button" class="action-btn secondary upd-go" onclick="hubUpdateAll()" ${updatesLoading ? "disabled" : ""}>Actualizar todo (${nOut})</button>` : ""}
+        </span>
       </div>`;
     if (updatesLoading) { hubList.innerHTML = bar + `<p class="hub-loading">Comprobando actualizaciones…</p>`; return; }
     if (!updatesRows.length) {
@@ -3081,7 +3084,11 @@
   .hub-tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 15px; height: 15px; margin-left: 5px; padding: 0 4px; border-radius: 999px; background: var(--color-primary); color: #fff; font-size: 9.5px; font-weight: 700; font-family: var(--font-mono); line-height: 1; vertical-align: 1px; }
   :global(.upd-bar) { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: var(--space-2); }
   :global(.upd-bar-info) { font-size: 11px; color: var(--color-text-tertiary); margin-right: auto; }
-  :global(.upd-bar .action-btn.secondary) { display: inline-flex; align-items: center; min-height: 26px; white-space: nowrap; }
+  :global(.upd-bar-actions) { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+  :global(.upd-bar .action-btn.secondary) { display: inline-flex; align-items: center; min-height: 26px; white-space: nowrap; color: var(--color-text-secondary); }
+  :global(.upd-bar .action-btn.secondary:hover) { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-border-strong); }
+  :global(.upd-bar .action-btn.secondary.upd-go) { background: var(--color-text); color: var(--color-bg); border-color: transparent; font-weight: var(--weight-medium); }
+  :global(.upd-bar .action-btn.secondary.upd-go:hover) { opacity: 0.88; background: var(--color-text); }
   :global(.upd-bar .action-btn:disabled) { opacity: 0.45; cursor: not-allowed; }
   :global(.upd-badge) { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; font-family: var(--font-mono); padding: 3px 8px; border-radius: 999px; border: 1px solid var(--color-border); color: var(--color-text-tertiary); white-space: nowrap; }
   :global(.upd-badge.ok) { color: #4ade80; border-color: rgba(74,222,128,0.25); background: rgba(74,222,128,0.07); }
