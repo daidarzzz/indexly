@@ -56,6 +56,14 @@
     return "linear-gradient(120deg, hsl(" + h + " 60% 30%) 0%, hsl(" + ((h + 45) % 360) + " 65% 20%) 100%)";
   }
 
+  // Placeholder sobrio: mismo hash de tono por juego pero apagado (s 22-28%,
+  // l 10-20%) + patrón de puntos del CSS + inicial en pastilla de cristal.
+  function phBackground(name) {
+    var h = hueFor(name);
+    var h2 = (h + 32) % 360;
+    return "radial-gradient(120% 90% at 50% 0%, hsl(" + h + " 26% 21%) 0%, hsl(" + h2 + " 30% 12%) 55%, #0b101c 100%)";
+  }
+
   function fmtDate(iso) {
     if (!iso) return "";
     var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -465,27 +473,61 @@
       ".gv-input:focus{border-color:#24344f;box-shadow:0 0 0 3px rgba(14,165,233,0.08)}",
       ".gv-input.box{border-radius:10px}",
       ".gv-select{background:#070a12;border:1px solid #1e293b;border-radius:999px;color:#94a3b8;font-size:11.5px;padding:8px 26px 8px 12px;cursor:pointer;appearance:none}",
-      ".gv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;overflow:auto}",
-      ".gv-card{background:#070a12;border:1px solid #1e293b;border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color .18s,transform .18s,box-shadow .18s;display:flex;flex-direction:column}",
-      ".gv-card:hover{border-color:rgba(14,165,233,0.45);transform:translateY(-3px) scale(1.015);box-shadow:0 10px 26px rgba(0,0,0,0.4)}",
-      ".gv-poster-wrap{position:relative;overflow:hidden;background:#0d1528}",
-      ".gv-poster{width:100%;aspect-ratio:184/258;object-fit:cover;display:block;transition:transform .25s ease}",
-      ".gv-card:hover .gv-poster{transform:scale(1.05)}",
-      ".gv-poster-ph{width:100%;aspect-ratio:184/258;display:grid;place-items:center;font-size:34px;font-weight:700;color:rgba(255,255,255,0.55);text-shadow:0 2px 8px rgba(0,0,0,0.4)}",
-      ".gv-badge-overlay{position:absolute;top:8px;left:8px;z-index:1;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}",
-      ".gv-card-body{padding:8px 10px 10px;display:flex;flex-direction:column;gap:3px}",
-      ".gv-card-name{font-size:12px;font-weight:600;color:#e2e8f0;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}",
-      ".gv-card-meta{font-size:10.5px;color:#64748b;display:flex;gap:6px;align-items:center;flex-wrap:wrap}",
-      ".gv-badge{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;border:1px solid;width:max-content}",
-      ".gv-banner{width:100%;height:210px;object-fit:cover;border-radius:12px;background:#0d1528;display:block;flex-shrink:0}",
+      ".gv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(184px,1fr));gap:16px;overflow:auto;padding:2px}",
+      ".gv-card{position:relative;background:linear-gradient(180deg,#10151f 0%,#0d1320 100%);border:1px solid #1a2332;border-radius:16px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;box-shadow:0 4px 14px rgba(0,0,0,0.28);transition:transform .22s cubic-bezier(.2,.7,.3,1),border-color .22s,box-shadow .22s;content-visibility:auto;contain-intrinsic-size:0 320px;min-width:0}",
+      ".gv-card:hover{transform:translateY(-4px);border-color:rgba(14,165,233,0.38);box-shadow:0 18px 44px rgba(0,0,0,0.5),0 0 0 1px rgba(14,165,233,0.16)}",
+      ".gv-card:focus-visible{outline:2px solid #0ea5e9;outline-offset:3px}",
+      ".gv-poster-wrap{position:relative;overflow:hidden;background:#0b111e;aspect-ratio:3/4;flex-shrink:0}",
+      ".gv-poster-wrap::before{content:\"\";position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,0.09) 1px,transparent 1px);background-size:14px 14px;mask-image:linear-gradient(180deg,black,transparent 78%);-webkit-mask-image:linear-gradient(180deg,black,transparent 78%);pointer-events:none;z-index:0}",
+      ".gv-poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:0;opacity:0;transition:opacity .45s ease,transform .55s cubic-bezier(.2,.7,.3,1)}",
+      ".gv-poster.is-loaded{opacity:1}",
+      ".gv-card:hover .gv-poster.is-loaded,.gv-card:focus-visible .gv-poster.is-loaded{transform:scale(1.05)}",
+      ".gv-poster-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:0}",
+      ".gv-poster-initial{display:grid;place-items:center;width:62px;height:62px;border-radius:18px;font-size:26px;font-weight:700;color:#fff;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);text-shadow:0 2px 10px rgba(0,0,0,0.45);box-shadow:0 8px 22px rgba(0,0,0,0.35)}",
+      ".gv-rating-pill{position:absolute;top:10px;right:10px;z-index:3;display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;font-family:var(--font-mono,ui-monospace,monospace);color:#fde68a;background:rgba(7,10,18,0.62);border:1px solid rgba(253,230,138,0.3);padding:4px 9px;border-radius:999px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 4px 12px rgba(0,0,0,0.35);transition:opacity .2s}",
+      "@media (prefers-reduced-motion:reduce){.gv-card,.gv-poster{transition:none}}",
+      ".gv-card-body{padding:12px 13px 10px;display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}",
+      ".gv-card-name{font-size:13.5px;font-weight:600;color:#f1f5f9;letter-spacing:-0.01em;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px}",
+      ".gv-card-sub{font-size:11.5px;color:#8b94a5;font-weight:500;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+      ".gv-card-foot{display:flex;align-items:center;gap:7px;border-top:1px solid #1a2332;padding:9px 13px 11px;margin-top:auto}",
+      ".gv-src-stat{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono,ui-monospace,monospace);font-size:10.5px;color:#7d8aa0;white-space:nowrap}",
+      ".gv-src-stat.has{color:#7dd3fc}",
+      ".gv-status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}",
+      ".gv-status-lbl{margin-left:auto;font-size:10.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+      "@keyframes gvFadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}",
+      ".gv-detail{display:flex;flex-direction:column;gap:16px;animation:gvFadeUp .35s ease both}",
+      ".gv-hero{position:relative;border-radius:18px;overflow:hidden;border:1px solid #1a2332;background:#0b111e;min-height:260px;flex-shrink:0}",
+      ".gv-hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}",
+      ".gv-hero-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}",
+      ".gv-hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,10,18,0.04) 28%,rgba(7,10,18,0.5) 60%,#0d1320 100%);pointer-events:none}",
+      ".gv-hero-rating{position:absolute;top:12px;right:12px;z-index:2;display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;font-family:var(--font-mono,ui-monospace,monospace);color:#fde68a;background:rgba(7,10,18,0.62);border:1px solid rgba(253,230,138,0.3);padding:5px 10px;border-radius:999px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}",
+      ".gv-hero-inner{position:absolute;left:0;right:0;bottom:0;z-index:1;display:flex;gap:16px;align-items:flex-end;padding:18px;min-width:0}",
+      ".gv-hero-cover{width:148px;aspect-ratio:3/4;object-fit:cover;border-radius:14px;border:1px solid rgba(255,255,255,0.14);box-shadow:0 12px 30px rgba(0,0,0,0.5);flex-shrink:0;background:#0d1528;display:block}",
+      ".gv-hero-cover-ph{width:148px;aspect-ratio:3/4;border-radius:14px;border:1px solid rgba(255,255,255,0.14);box-shadow:0 12px 30px rgba(0,0,0,0.5);flex-shrink:0;display:flex;align-items:center;justify-content:center}",
+      ".gv-hero-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;padding-bottom:2px}",
+      ".gv-title-xl{margin:0;font-size:22px;font-weight:800;letter-spacing:-0.02em;line-height:1.2;color:#f8fafc;text-shadow:0 2px 12px rgba(0,0,0,0.5)}",
+      ".gv-hero-sub{font-size:13px;font-weight:500;color:#a8b2c2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+      ".gv-stats{display:flex;gap:20px;align-items:center;flex-wrap:wrap;background:#0a0f1c;border:1px solid #1e293b;border-radius:14px;padding:12px 16px}",
+      ".gv-stat{display:flex;flex-direction:column;gap:1px}",
+      ".gv-stat-score{font-size:19px;font-weight:800;letter-spacing:-0.01em;color:#f1f5f9;line-height:1.2}",
+      ".gv-stat-score.amber{color:#fde68a}",
+      ".gv-stat-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#64748b}",
+      ".gv-desc-full{margin:0;font-size:13.5px;line-height:1.75;color:#cbd5e1;white-space:pre-wrap}",
+      ".gv-desc-clamp{display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}",
+      ".gv-desc-clamp.gv-fade{mask-image:linear-gradient(180deg,black 62%,transparent 98%);-webkit-mask-image:linear-gradient(180deg,black 62%,transparent 98%)}",
+      ".gv-more{align-self:flex-start;background:transparent;border:1px solid #1e293b;border-radius:999px;color:#94a3b8;padding:6px 14px;font-size:11.5px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}",
+      ".gv-more:hover{background:#152033;color:#e2e8f0;border-color:#24344f}",
+      ".gv-shots img{height:120px;border-radius:12px;border:1px solid #1a2332;cursor:pointer;background:#0d1528;flex-shrink:0;object-fit:cover;transition:transform .2s,border-color .2s}",
+      ".gv-shots img:hover{transform:translateY(-2px);border-color:#24344f}",
+      ".gv-src-row:hover{border-color:#24344f}",
+      ".gv-del{width:28px;height:28px;display:grid;place-items:center;background:transparent;border:1px solid rgba(248,113,113,0.3);color:#f87171;border-radius:999px;font-size:12px;cursor:pointer;opacity:.55;transition:all .15s;flex-shrink:0;font-family:inherit;padding:0}",
+      ".gv-del:hover{opacity:1;background:rgba(248,113,113,0.1);color:#fca5a5}",
+      "@media (max-width:640px){.gv-hero{min-height:200px}.gv-hero-inner{padding:14px;gap:12px}.gv-hero-cover,.gv-hero-cover-ph{width:104px}.gv-hero-cover-ph .gv-poster-initial{width:46px;height:46px;font-size:20px;border-radius:14px}.gv-title-xl{font-size:18px}.gv-hero-sub{font-size:12px}.gv-shots img{height:92px}.gv-stats{gap:14px;padding:10px 14px}}",
       ".gv-meta-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}",
       ".gv-tag{font-size:10px;font-weight:500;padding:3px 9px;border:1px solid #1e293b;border-radius:999px;color:#94a3b8;background:#0f141e}",
-      ".gv-desc{font-size:12.5px;color:#cbd5e1;line-height:1.65;white-space:pre-wrap;max-height:230px;overflow:auto;background:#070a12;border:1px solid #1e293b;border-radius:10px;padding:12px 14px}",
-      ".gv-caption{margin:0;font-size:11.5px;color:#94a3b8}",
-      ".gv-cover{width:120px;border-radius:10px;display:block;background:#0d1528;box-shadow:0 6px 18px rgba(0,0,0,0.35);flex-shrink:0}",
       ".gv-shots{display:flex;gap:8px;overflow-x:auto}",
-      ".gv-shots img{height:74px;border-radius:8px;cursor:pointer;background:#0d1528;flex-shrink:0}",
-      ".gv-section{display:flex;flex-direction:column;gap:10px}",
+      ".gv-shots img{height:120px;border-radius:12px;border:1px solid #1a2332;cursor:pointer;background:#0d1528;flex-shrink:0;object-fit:cover;transition:transform .2s,border-color .2s}",
+      ".gv-section{display:flex;flex-direction:column;gap:12px;background:#0a0f1c;border:1px solid #1e293b;border-radius:16px;padding:14px 16px}",
       ".gv-section-title{display:flex;align-items:center;gap:10px}",
       ".gv-section-title h5{margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94a3b8}",
       ".gv-src-row{display:flex;align-items:center;gap:10px;border:1px solid #1e293b;background:#070a12;border-radius:10px;padding:10px 12px}",
@@ -505,34 +547,16 @@
       ".gv-help{font-size:11px;color:#64748b;line-height:1.6;background:#070a12;border:1px solid #1e293b;border-radius:10px;padding:12px 14px}",
       ".gv-help code{font-family:var(--font-mono,monospace);color:#7dd3fc;font-size:10.5px}",
       ".gv-help a{color:#7dd3fc}",
-      "@media (max-width:640px){.gv-grid{grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px}.gv-banner{height:150px}}",
+      "@media (max-width:640px){.gv-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}.gv-card-name{font-size:12.5px;min-height:34px}}",
     ].join("\n");
     document.head.appendChild(s);
   }
 
-  function coverEl(game, cls) {
-    if (game.imageUrl) {
-      var img = document.createElement("img");
-      img.className = cls;
-      img.src = game.imageUrl;
-      img.alt = "";
-      img.loading = "lazy";
-      img.addEventListener("error", function () {
-        var ph = el("div", "gv-card-ph", (game.name || "?").charAt(0).toUpperCase());
-        ph.style.background = gradientFor(game.name);
-        img.replaceWith(ph);
-      });
-      return img;
-    }
-    var ph = el("div", "gv-card-ph", (game.name || "?").charAt(0).toUpperCase());
-    ph.style.background = gradientFor(game.name);
-    return ph;
-  }
-
   // Carátula vertical (estantería): prefiere coverUrl de IGDB, cae a imageUrl y a placeholder
   function posterPh(game) {
-    var ph = el("div", "gv-poster-ph", (game.name || "?").charAt(0).toUpperCase());
-    ph.style.background = gradientFor(game.name);
+    var ph = el("div", "gv-poster-ph");
+    ph.style.background = phBackground(game.name);
+    ph.appendChild(el("span", "gv-poster-initial", (game.name || "?").charAt(0).toUpperCase()));
     return ph;
   }
   function posterEl(game) {
@@ -541,21 +565,15 @@
       var img = document.createElement("img");
       img.className = "gv-poster";
       img.src = url;
-      img.alt = "";
+      img.alt = game.name || "";
       img.loading = "lazy";
+      img.decoding = "async";
+      img.addEventListener("load", function () { img.classList.add("is-loaded"); });
+      if (img.complete && img.naturalWidth) img.classList.add("is-loaded");
       img.addEventListener("error", function () { img.replaceWith(posterPh(game)); });
       return img;
     }
     return posterPh(game);
-  }
-
-  function statusBadge(statusId, extraCls) {
-    var st = statusOf(statusId);
-    var b = el("span", "gv-badge" + (extraCls ? " " + extraCls : ""), st.label);
-    b.style.color = st.color;
-    b.style.borderColor = st.color + "44";
-    b.style.background = st.color + "14";
-    return b;
   }
 
   // ---------- vistas ----------
@@ -700,27 +718,44 @@
         return;
       }
       list.forEach(function (g) {
-        var card = el("div", "gv-card");
+        var card = el("article", "gv-card");
+        card.setAttribute("tabindex", "0");
+        card.setAttribute("role", "button");
+        card.setAttribute("aria-label", g.name + " — ver ficha");
         var posterWrap = el("div", "gv-poster-wrap");
         posterWrap.appendChild(posterEl(g));
-        var badge = statusBadge(g.status);
-        badge.classList.add("gv-badge-overlay");
-        badge.style.background = "rgba(7,10,18,0.62)";
-        posterWrap.appendChild(badge);
+        if (g.rating != null) {
+          posterWrap.appendChild(el("span", "gv-rating-pill", "★ " + g.rating));
+        }
         card.appendChild(posterWrap);
         var body = el("div", "gv-card-body");
         body.appendChild(el("div", "gv-card-name", g.name));
-        var meta = el("div", "gv-card-meta");
-        var bits = [];
-        if (g.released) bits.push(fmtDate(g.released).slice(3));
-        if (g.rating != null) bits.push("★ " + g.rating);
-        if (g.sources && g.sources.length) bits.push(g.sources.length === 1 ? "1 fuente" : g.sources.length + " fuentes");
-        if (bits.length) meta.appendChild(el("span", "", bits.join(" · ")));
-        if (meta.children.length) body.appendChild(meta);
+        var subBits = [];
+        if (g.released) subBits.push(String(g.released).slice(0, 4));
+        if (g.developer) subBits.push(g.developer);
+        if (!subBits.length && g.genres && g.genres.length) subBits.push(g.genres[0]);
+        if (subBits.length) body.appendChild(el("div", "gv-card-sub", subBits.join(" · ")));
         card.appendChild(body);
-        card.addEventListener("click", function () {
+        var foot = el("div", "gv-card-foot");
+        var nSrc = (g.sources || []).length;
+        var srcStat = el("span", "gv-src-stat" + (nSrc ? " has" : ""), nSrc === 1 ? "⬇ 1 fuente" : "⬇ " + nSrc + " fuentes");
+        foot.appendChild(srcStat);
+        var st = statusOf(g.status);
+        var dot = el("span", "gv-status-dot");
+        dot.style.background = st.color;
+        dot.style.color = st.color;
+        foot.appendChild(dot);
+        var lbl = el("span", "gv-status-lbl", st.label);
+        lbl.style.color = st.color;
+        foot.appendChild(lbl);
+        card.appendChild(foot);
+        var open = function () {
           state.gameId = g.id;
           go("detail");
+        };
+        card.addEventListener("click", open);
+        card.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
         });
         listWrap.appendChild(card);
       });
@@ -837,13 +872,20 @@
     }
   }
 
+  function openPicker() {
+    state.picks = {};
+    state.pickQuery = "";
+    state.pickIndexId = null;
+    go("picker");
+  }
+
   function renderDetail(page) {
     var g = currentGame();
     if (!g) { go("library"); return; }
-    var st = statusOf(g.status);
 
-    headerBar(page, g.name, null, [
+    headerBar(page, "Ficha", null, [
       { label: "← Volver", onClick: function () { go("library"); } },
+      { label: "＋ Fuente", onClick: function () { openPicker(); } },
       { label: "Eliminar", danger: true, onClick: function () {
         api.modal({
           title: "Eliminar juego",
@@ -861,44 +903,87 @@
       } },
     ]);
 
-    // Banner horizontal + cover vertical (carátula IGDB) lado a lado
-    var hero = el("div", "gv-head");
-    hero.style.alignItems = "stretch";
-    hero.appendChild(coverEl(g, "gv-banner"));
-    if (g.coverUrl) {
-      var coverWrap = el("div");
-      coverWrap.style.cssText = "flex-shrink:0;width:120px";
-      var cv = document.createElement("img");
-      cv.className = "gv-cover";
-      cv.src = g.coverUrl;
-      cv.alt = "";
-      cv.loading = "lazy";
-      cv.style.cssText = "width:120px;border-radius:10px;display:block;background:#0d1528";
-      coverWrap.appendChild(cv);
-      hero.appendChild(coverWrap);
-    }
-    page.appendChild(hero);
+    var detail = el("div", "gv-detail");
+    page.appendChild(detail);
 
-    var meta = el("div", "gv-meta-row");
-    meta.appendChild(statusBadge(g.status));
-    if (g.rating != null) { var r = el("span", "gv-tag", "★ " + g.rating); meta.appendChild(r); }
-    if (g.metacritic != null) { var mc = el("span", "gv-tag", "Metacritic " + g.metacritic); meta.appendChild(mc); }
-    if (g.released) { var rl = el("span", "gv-tag", fmtDate(g.released)); meta.appendChild(rl); }
-    if (g.pegi) { var pg = el("span", "gv-tag", "PEGI " + g.pegi); meta.appendChild(pg); }
-    (g.genres || []).slice(0, 4).forEach(function (gn) { meta.appendChild(el("span", "gv-tag", gn)); });
-    page.appendChild(meta);
-    if (g.developer) {
-      page.appendChild(el("p", "gv-caption", "Desarrollado por " + g.developer));
+    function heroCoverPh() {
+      var hcp = el("div", "gv-hero-cover-ph");
+      hcp.style.background = phBackground(g.name);
+      hcp.appendChild(el("span", "gv-poster-initial", (g.name || "?").charAt(0).toUpperCase()));
+      return hcp;
     }
-    if ((g.platforms || []).length) {
-      var platRow = el("div", "gv-meta-row");
-      gdbPlatforms().then(function (map) {
-        if (!platRow.isConnected) return;
-        (g.platforms || []).slice(0, 6).forEach(function (pid) {
-          platRow.appendChild(el("span", "gv-tag", map[pid] || ("Plataforma " + pid)));
-        });
-      }).catch(function () {});
-      page.appendChild(platRow);
+
+    // Hero cinematográfico: banner a sangre + cover solapada + título sobre degradado
+    var hero = el("div", "gv-hero");
+    if (g.imageUrl) {
+      var hb = document.createElement("img");
+      hb.className = "gv-hero-img";
+      hb.src = g.imageUrl;
+      hb.alt = "";
+      hb.loading = "lazy";
+      hb.decoding = "async";
+      hb.addEventListener("error", function () {
+        var bhp = el("div", "gv-hero-ph");
+        bhp.style.background = phBackground(g.name);
+        hb.replaceWith(bhp);
+      });
+      hero.appendChild(hb);
+    } else {
+      var bhp0 = el("div", "gv-hero-ph");
+      bhp0.style.background = phBackground(g.name);
+      bhp0.appendChild(el("span", "gv-poster-initial", (g.name || "?").charAt(0).toUpperCase()));
+      hero.appendChild(bhp0);
+    }
+    hero.appendChild(el("div", "gv-hero-shade"));
+    if (g.rating != null) hero.appendChild(el("span", "gv-hero-rating", "★ " + g.rating));
+    var hinner = el("div", "gv-hero-inner");
+    if (g.coverUrl || g.imageUrl) {
+      var hc = document.createElement("img");
+      hc.className = "gv-hero-cover";
+      hc.src = g.coverUrl || g.imageUrl;
+      hc.alt = g.name || "";
+      hc.loading = "lazy";
+      hc.decoding = "async";
+      hc.addEventListener("error", function () { hc.replaceWith(heroCoverPh()); });
+      hinner.appendChild(hc);
+    } else {
+      hinner.appendChild(heroCoverPh());
+    }
+    var htxt = el("div", "gv-hero-txt");
+    htxt.appendChild(el("h2", "gv-title-xl", g.name));
+    var hsub = [];
+    if (g.released) hsub.push(String(g.released).slice(0, 4));
+    if (g.developer) hsub.push(g.developer);
+    if (hsub.length) htxt.appendChild(el("div", "gv-hero-sub", hsub.join(" · ")));
+    hinner.appendChild(htxt);
+    hero.appendChild(hinner);
+    detail.appendChild(hero);
+
+    var stats = el("div", "gv-stats");
+    var mkStat = function (score, lbl, amber) {
+      var s = el("div", "gv-stat");
+      s.appendChild(el("div", "gv-stat-score" + (amber ? " amber" : ""), score));
+      s.appendChild(el("div", "gv-stat-lbl", lbl));
+      return s;
+    };
+    if (g.rating != null) stats.appendChild(mkStat("★ " + g.rating, "IGDB", true));
+    if (g.metacritic != null) stats.appendChild(mkStat(String(g.metacritic), "Metacritic", false));
+    if (g.released) stats.appendChild(mkStat(String(g.released).slice(0, 4), "Año", false));
+    if (g.pegi) stats.appendChild(mkStat("PEGI " + g.pegi, "Edad", false));
+    if (stats.children.length) detail.appendChild(stats);
+
+    if (((g.genres || []).length) || ((g.platforms || []).length)) {
+      var tagRow = el("div", "gv-meta-row");
+      (g.genres || []).slice(0, 4).forEach(function (gn) { tagRow.appendChild(el("span", "gv-tag", gn)); });
+      if ((g.platforms || []).length) {
+        gdbPlatforms().then(function (map) {
+          if (!tagRow.isConnected) return;
+          (g.platforms || []).slice(0, 6).forEach(function (pid) {
+            tagRow.appendChild(el("span", "gv-tag", map[pid] || ("Plataforma " + pid)));
+          });
+        }).catch(function () {});
+      }
+      detail.appendChild(tagRow);
     }
 
     // Selector de estado
@@ -913,11 +998,25 @@
       });
       stRow.appendChild(c);
     });
-    page.appendChild(stRow);
+    detail.appendChild(stRow);
 
     if (g.description) {
-      var desc = el("div", "gv-desc", g.description);
-      page.appendChild(desc);
+      var dcol = el("div");
+      dcol.style.cssText = "display:flex;flex-direction:column;gap:8px;align-items:flex-start";
+      var desc = el("p", "gv-desc-full gv-desc-clamp gv-fade", g.description);
+      dcol.appendChild(desc);
+      if (g.description.length > 420) {
+        var moreBtn = el("button", "gv-more", "Leer más");
+        moreBtn.type = "button";
+        var expanded = false;
+        moreBtn.addEventListener("click", function () {
+          expanded = !expanded;
+          if (expanded) { desc.classList.remove("gv-desc-clamp"); desc.classList.remove("gv-fade"); moreBtn.textContent = "Leer menos"; }
+          else { desc.classList.add("gv-desc-clamp"); desc.classList.add("gv-fade"); moreBtn.textContent = "Leer más"; }
+        });
+        dcol.appendChild(moreBtn);
+      }
+      detail.appendChild(dcol);
     } else if (g.gdbId) {
       // Enriquecimiento perezoso: el juego se añadió sin detalle
       gdbGame(g.gdbId).then(function (d) {
@@ -955,7 +1054,7 @@
         });
         shots.appendChild(img);
       });
-      page.appendChild(shots);
+      detail.appendChild(shots);
     }
 
     if (g.website || g.gdbUrl) {
@@ -972,7 +1071,7 @@
         rg.addEventListener("click", function () { api.openLink(g.gdbUrl); });
         links.appendChild(rg);
       }
-      page.appendChild(links);
+      detail.appendChild(links);
     }
 
     // Fuentes
@@ -983,12 +1082,7 @@
     st2.appendChild(el("span", "gv-spacer"));
     var addBtn = el("button", "gv-btn gv-btn-primary", "＋ Añadir fuentes");
     addBtn.type = "button";
-    addBtn.addEventListener("click", function () {
-      state.picks = {};
-      state.pickQuery = "";
-      state.pickIndexId = null;
-      go("picker");
-    });
+    addBtn.addEventListener("click", openPicker);
     st2.appendChild(addBtn);
     sec.appendChild(st2);
 
@@ -1007,15 +1101,16 @@
         info.appendChild(el("small", "", s.sourceName || "Fuente"));
         row.appendChild(info);
         if (s.itemLink) {
-          var dl = el("button", "gv-btn gv-btn-primary", "Descargar ↗");
+          var dl = el("button", "gv-btn", "Descargar ↗");
           dl.type = "button";
           dl.addEventListener("click", function () { api.openLink(s.itemLink); });
           row.appendChild(dl);
         } else {
           row.appendChild(el("span", "gv-tag", "sin enlace"));
         }
-        var rm = el("button", "gv-btn gv-btn-danger", "Quitar");
+        var rm = el("button", "gv-del", "✕");
         rm.type = "button";
+        rm.title = "Quitar fuente";
         rm.addEventListener("click", function () {
           g.sources = g.sources.filter(function (x) { return x !== s; });
           saveGames();
@@ -1025,7 +1120,7 @@
         sec.appendChild(row);
       });
     }
-    page.appendChild(sec);
+    detail.appendChild(sec);
   }
 
   // ---------- picker de fuentes ----------
