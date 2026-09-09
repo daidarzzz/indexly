@@ -1,7 +1,7 @@
 /* IndexLy Plugin
    id: readly
    name: ReadLy
-   version: 1.4.3
+    version: 1.5.0
    description: Tu biblioteca de libros dentro de IndexLy: añade tus EPUB, PDF y TXT, léalos en un lector a pantalla completa con temas, índice de capítulos y progreso guardado por página. La carátula se extrae del propio EPUB; ficha automática de Google Books como complemento. Todo local.
    permissions: network, ui, storage
 */
@@ -348,6 +348,13 @@
       ".lib-btn-primary:hover{background:#f1f5f9;color:#0f172a}",
       ".lib-btn-danger{color:#f87171;border-color:rgba(248,113,113,0.3)}",
       ".lib-btn-danger:hover{background:rgba(248,113,113,0.08);color:#fca5a5;border-color:rgba(248,113,113,0.4)}",
+      ".lib-btn-subtle{opacity:.55}",
+      ".lib-btn-subtle:hover{opacity:1}",
+      ".lib-imp-list{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;margin:8px 0}",
+      ".lib-imp-row{display:flex;gap:8px;align-items:center;font-size:12px;color:#cbd5e1;border:1px solid #1e293b;border-radius:8px;padding:6px 10px;background:#070a12}",
+      ".lib-imp-row small{color:#64748b}",
+      ".lib-imp-new{color:#22c55e;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.05em;flex-shrink:0}",
+      ".lib-imp-dup{color:#f59e0b;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.05em;flex-shrink:0}",
       ".lib-chip{background:transparent;border:1px solid #1e293b;border-radius:999px;color:#94a3b8;padding:5px 11px;font-size:11px;font-weight:500;cursor:pointer;transition:all .15s}",
       ".lib-chip:hover{color:#e2e8f0;background:rgba(255,255,255,0.04)}",
       ".lib-chip.active{background:#fff;border-color:#fff;color:#0f172a;font-weight:600}",
@@ -400,6 +407,9 @@
       ".lib-reader-top h4{margin:0;font-size:13px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}",
       ".lib-reader-top small{font-size:11px;color:#64748b;white-space:nowrap}",
       ".lib-reader-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap}",
+      ".lib-tools-toggle{opacity:.6;padding:7px 10px;font-weight:400;letter-spacing:.1em}",
+      ".lib-tools-toggle:hover{opacity:1}",
+      ".lib-reader.lib-tools-hidden .lib-reader-tools{display:none}",
       ".lib-reader-body{flex:1;min-height:0;position:relative;overflow:hidden}",
       ".lib-reader-view{position:absolute;inset:0}",
       ".lib-reader-bottom{display:flex;align-items:center;gap:12px;padding:8px 16px;border-top:1px solid #1e293b;background:#0a0f1c;flex-shrink:0}",
@@ -418,11 +428,37 @@
       ".lib-nav-arrow:active{background:rgba(14,165,233,0.35);opacity:1}",
       ".lib-nav-left{left:6px}",
       ".lib-nav-right{right:6px}",
-      ".lib-nav-off .lib-nav-arrow,.lib-nav-off .lib-tapzone{display:none!important}",
+      ".lib-nav-off .lib-nav-arrow,.lib-nav-off .lib-tapzone,.lib-nav-off .lib-hide-nav{display:none!important}",
       ".lib-hide-nav{display:none!important}",
+      ".lib-reader.is-touch .lib-hide-nav{display:inline-flex!important}",
       "@media (max-width:640px){.lib-hide-nav{display:inline-flex!important}}",
       "@media (max-width:640px){.lib-tapzone{display:block}.lib-nav-arrow{display:flex}}",
+      "@media (hover:none) and (pointer:coarse){.lib-tapzone{display:block}.lib-nav-arrow{display:flex}.lib-hide-nav{display:inline-flex!important}}",
+      ".lib-reader.is-touch .lib-tapzone{display:block}",
+      ".lib-reader.is-touch .lib-nav-arrow{display:flex}",
       ".lib-pdfframe{width:100%;height:100%;border:0;background:#14161c}",
+      "@keyframes libFadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}",
+      ".lib-detail{display:flex;flex-direction:column;gap:16px;animation:libFadeUp .35s ease both}",
+      ".lib-detail-nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap}",
+      ".lib-hero{display:flex;gap:18px;align-items:flex-start;background:linear-gradient(180deg,rgba(167,139,250,0.07),rgba(167,139,250,0.02));border:1px solid #1e293b;border-radius:18px;padding:18px;position:relative;overflow:hidden}",
+      ".lib-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(420px 160px at 12% 0%,rgba(167,139,250,0.12),transparent 70%);pointer-events:none}",
+      ".lib-cover{width:128px;flex-shrink:0;border-radius:12px;overflow:hidden;background:#0d1528;box-shadow:0 12px 30px rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.08);position:relative;z-index:1}",
+      ".lib-hero-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;position:relative;z-index:1}",
+      ".lib-title-xl{font-size:20px;font-weight:800;color:#f8fafc;letter-spacing:-0.02em;line-height:1.25;margin:0}",
+      ".lib-author{font-size:13px;color:#94a3b8;font-weight:500}",
+      ".lib-meta-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}",
+      ".lib-progress{height:6px;border-radius:999px;background:#141b29;overflow:hidden;width:100%;max-width:300px}",
+      ".lib-progress i{display:block;height:100%;background:linear-gradient(90deg,#a78bfa,#7c6cf0);border-radius:999px;transition:width .4s ease}",
+      ".lib-progress-lbl{font-size:11.5px;color:#a78bfa;font-weight:600}",
+      ".lib-status-row{display:flex;gap:8px;flex-wrap:wrap}",
+      ".lib-card-sec{background:#0a0f1c;border:1px solid #1e293b;border-radius:14px;padding:14px 16px;transition:border-color .2s}",
+      ".lib-card-sec:hover{border-color:#24344f}",
+      ".lib-sec-h{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#64748b;margin:0 0 10px}",
+      ".lib-sec-h small{color:#475569;text-transform:none;letter-spacing:0;font-weight:500}",
+      ".lib-desc-smooth{font-size:13px;color:#cbd5e1;line-height:1.75;white-space:pre-wrap;max-height:240px;overflow:auto;margin:0;scrollbar-width:thin}",
+      ".lib-detail-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;opacity:0.92}",
+      ".lib-read-cta{font-size:13px!important;padding:10px 20px!important}",
+      "@media (max-width:640px){.lib-hero{flex-direction:row;padding:14px;gap:14px}.lib-cover{width:96px}.lib-title-xl{font-size:17px}}",
       // Móvil: barras compactas, grid más denso, tap targets grandes, TOC ancho
       "@media (max-width:640px){" +
         ".lib-grid{grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}" +
@@ -502,6 +538,8 @@
   function renderLibrary(page) {
     var books = booksCache || [];
     headerBar(page, "ReadLy", books.length === 1 ? "1 libro" : books.length + " libros", [
+      { label: "⤓ Exportar", subtle: true, disabled: !books.length, onClick: exportLibrary },
+      { label: "⤒ Importar", subtle: true, onClick: importLibrary },
       { label: "＋ Añadir libros", primary: true, onClick: openAddDialog },
     ]);
 
@@ -617,7 +655,7 @@
     if (count != null) head.appendChild(el("small", "", count));
     head.appendChild(el("span", "lib-spacer"));
     (actions || []).forEach(function (a) {
-      var b = el("button", "lib-btn" + (a.primary ? " lib-btn-primary" : "") + (a.danger ? " lib-btn-danger" : ""), a.label);
+      var b = el("button", "lib-btn" + (a.primary ? " lib-btn-primary" : "") + (a.danger ? " lib-btn-danger" : "") + (a.subtle ? " lib-btn-subtle" : ""), a.label);
       b.type = "button";
       if (a.disabled) b.disabled = true;
       else b.addEventListener("click", a.onClick);
@@ -631,14 +669,26 @@
   function openAddDialog() {
     var fi = document.createElement("input");
     fi.type = "file";
-    fi.accept = ".epub,.pdf,.txt";
+    fi.accept = ".epub,.pdf,.txt,application/epub+zip,application/pdf,text/plain";
     fi.multiple = true;
+    // En iOS el input debe estar en el DOM para que el picker se abra de forma fiable
+    fi.style.cssText = "position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0";
+    fi.setAttribute("aria-hidden", "true");
+    document.body.appendChild(fi);
     fi.addEventListener("change", function () {
       var files = Array.prototype.slice.call(fi.files || []);
+      try { fi.remove(); } catch (e) { if (fi.parentNode) fi.parentNode.removeChild(fi); }
       if (!files.length) return;
       files.forEach(function (f) { addBookFile(f); });
     });
-    fi.click();
+    // Si el usuario cancela, limpia el input huérfano
+    fi.addEventListener("cancel", function () {
+      setTimeout(function () { try { fi.remove(); } catch (e) {} }, 500);
+    });
+    try { fi.click(); } catch (e) {
+      try { fi.remove(); } catch (_e) {}
+      api.showToast("Tu navegador bloqueó el selector de ficheros. Toca de nuevo «Añadir libros».", "warning", 5000);
+    }
   }
 
   function addBookFile(file) {
@@ -659,7 +709,7 @@
       progress: null, // { cfi, percentage, chapter, updatedAt } — solo EPUB
       sources: [],
     };
-    file.arrayBuffer().then(function (buf) {
+    blobToArrayBuffer(file).then(function (buf) {
       return storeFile(id, new Blob([buf])).then(function () { return buf; });
     }).then(function (buf) {
       booksCache.push(rec);
@@ -726,84 +776,89 @@
   function renderDetail(page) {
     var b = currentBook();
     if (!b) { go("library"); return; }
+    var wrap = el("div", "lib-detail");
+    page.appendChild(wrap);
 
-    // Cabecera mínima: solo volver + leer. La gestión vive abajo, en "Gestión".
-    headerBar(page, b.title || "Sin título", b.author || null, [
-      { label: "← Volver", onClick: function () { go("library"); } },
-      { label: b.kind === "epub" && pct(b) > 0 ? "Continuar (" + pct(b) + "%)" : "Leer", primary: true, onClick: function () { openReader(b); } },
-    ]);
+    // Barra superior mínima: volver discreto + acción principal
+    var nav = el("div", "lib-detail-nav");
+    var back = el("button", "lib-btn", "← Biblioteca");
+    back.type = "button";
+    back.addEventListener("click", function () { go("library"); });
+    nav.appendChild(back);
+    nav.appendChild(el("span", "lib-spacer"));
+    var readCta = el("button", "lib-btn lib-btn-primary lib-read-cta", b.kind === "epub" && pct(b) > 0 ? "Continuar · " + pct(b) + "%" : "Leer ahora");
+    readCta.type = "button";
+    readCta.addEventListener("click", function () { openReader(b); });
+    nav.appendChild(readCta);
+    wrap.appendChild(nav);
 
-    // Hero: portada + datos esenciales + estado + progreso
-    var hero = el("div", "lib-head");
-    hero.style.alignItems = "flex-start";
-    var coverWrap = el("div");
-    coverWrap.style.cssText = "width:130px;flex-shrink:0;border-radius:10px;overflow:hidden;background:#0d1528";
+    // Hero: portada + título + meta + progreso + estados
+    var hero = el("div", "lib-hero");
+    var coverWrap = el("div", "lib-cover");
     coverWrap.appendChild(posterFor(b));
     hero.appendChild(coverWrap);
-    var heroInfo = el("div");
-    heroInfo.style.cssText = "flex:1;min-width:0;display:flex;flex-direction:column;gap:8px";
-    var titleEl = el("div");
-    titleEl.style.cssText = "font-size:17px;font-weight:700;color:#f1f5f9;letter-spacing:-0.01em;line-height:1.3";
-    titleEl.textContent = b.title || "Sin título";
-    heroInfo.appendChild(titleEl);
-    if (b.author) {
-      var au = el("div", "", b.author);
-      au.style.cssText = "font-size:12.5px;color:#94a3b8";
-      heroInfo.appendChild(au);
-    }
-    var meta = el("div", "lib-head");
+    var info = el("div", "lib-hero-info");
+    var titleEl = el("h2", "lib-title-xl", b.title || "Sin título");
+    info.appendChild(titleEl);
+    if (b.author) info.appendChild(el("div", "lib-author", b.author));
+    var meta = el("div", "lib-meta-row");
     if (b.year) meta.appendChild(el("span", "lib-tag", b.year));
     if (b.pages) meta.appendChild(el("span", "lib-tag", b.pages + " págs."));
     if (b.publisher) meta.appendChild(el("span", "lib-tag", b.publisher));
     meta.appendChild(el("span", "lib-tag", (b.kind || "").toUpperCase()));
-    if (meta.children.length) heroInfo.appendChild(meta);
-    // Barra de progreso + texto
+    if (meta.children.length) info.appendChild(meta);
     if (b.kind === "epub" && b.progress && pct(b) > 0) {
-      var track = el("div");
-      track.style.cssText = "height:4px;border-radius:999px;background:#141b29;overflow:hidden;width:100%;max-width:280px";
-      var fillEl = el("span");
-      fillEl.style.cssText = "display:block;height:100%;width:" + pct(b) + "%;background:#a78bfa;border-radius:999px";
+      var track = el("div", "lib-progress");
+      var fillEl = el("i");
+      fillEl.style.width = pct(b) + "%";
       track.appendChild(fillEl);
-      heroInfo.appendChild(track);
-      var pl = el("small", "", "");
-      pl.style.cssText = "color:#a78bfa";
-      pl.textContent = pct(b) + "%" + (b.progress.page ? " · " + b.progress.page : "") + (b.progress.chapter ? " · " + b.progress.chapter : "");
-      heroInfo.appendChild(pl);
+      info.appendChild(track);
+      var pl = el("div", "lib-progress-lbl", pct(b) + "%" + (b.progress.page ? " · " + b.progress.page : "") + (b.progress.chapter ? " · " + b.progress.chapter : ""));
+      info.appendChild(pl);
     }
-    var stRow = el("div", "lib-head");
+    var stRow = el("div", "lib-status-row");
     STATUSES.forEach(function (st) {
       var c = el("button", "lib-chip" + ((b.status || "todo") === st.id ? " active" : ""), st.label);
       c.type = "button";
       c.addEventListener("click", function () { b.status = st.id; saveBooks(); rerender(); });
       stRow.appendChild(c);
     });
-    heroInfo.appendChild(stRow);
-    hero.appendChild(heroInfo);
-    page.appendChild(hero);
+    info.appendChild(stRow);
+    hero.appendChild(info);
+    wrap.appendChild(hero);
 
-    // Descripción
+    // Sinopsis
     if (b.description) {
-      var desc = el("div", "lib-desc", b.description);
-      page.appendChild(desc);
+      var descCard = el("div", "lib-card-sec");
+      descCard.appendChild(el("h5", "lib-sec-h", "Sinopsis"));
+      descCard.appendChild(el("p", "lib-desc-smooth", b.description));
+      wrap.appendChild(descCard);
     }
 
     // Fuentes enlazadas
-    var sec = el("div", "lib-head");
-    sec.appendChild(el("h4", "", "Fuentes enlazadas"));
-    sec.appendChild(el("small", "", (b.sources || []).length === 1 ? "1 enlace" : (b.sources || []).length + " enlaces"));
-    sec.appendChild(el("span", "lib-spacer"));
+    var srcCard = el("div", "lib-card-sec");
+    var srcHead = el("div", "lib-detail-nav");
+    srcHead.style.marginBottom = "10px";
+    var srcTitle = el("h5", "lib-sec-h", "Fuentes enlazadas");
+    srcTitle.style.margin = "0";
+    srcHead.appendChild(srcTitle);
+    var srcCount = el("small", "", (b.sources || []).length === 1 ? "1 enlace" : (b.sources || []).length + " enlaces");
+    srcCount.style.cssText = "color:#475569;font-size:11px";
+    srcHead.appendChild(srcCount);
+    srcHead.appendChild(el("span", "lib-spacer"));
     var addSrc = el("button", "lib-btn", "＋ Enlazar");
     addSrc.type = "button";
     addSrc.addEventListener("click", function () { openSourcePicker(b); });
-    sec.appendChild(addSrc);
-    page.appendChild(sec);
+    srcHead.appendChild(addSrc);
+    srcCard.appendChild(srcHead);
     if ((b.sources || []).length) {
       b.sources.forEach(function (s) {
         var row = el("div", "lib-src-row");
-        var info = el("div", "lib-src-info");
-        info.appendChild(el("strong", "", s.itemTitle || "Sin título"));
-        info.appendChild(el("small", "", s.sourceName || "Fuente"));
-        row.appendChild(info);
+        row.style.marginBottom = "8px";
+        var sInfo = el("div", "lib-src-info");
+        sInfo.appendChild(el("strong", "", s.itemTitle || "Sin título"));
+        sInfo.appendChild(el("small", "", s.sourceName || "Fuente"));
+        row.appendChild(sInfo);
         if (s.itemLink) {
           var dl = el("button", "lib-btn", "Abrir ↗");
           dl.type = "button";
@@ -818,13 +873,17 @@
           rerender();
         });
         row.appendChild(rm);
-        page.appendChild(row);
+        srcCard.appendChild(row);
       });
+    } else {
+      var none = el("div", "", "Sin fuentes enlazadas. Conecta la descarga original del Hub para tenerla a mano.");
+      none.style.cssText = "font-size:12px;color:#64748b;line-height:1.6";
+      srcCard.appendChild(none);
     }
+    wrap.appendChild(srcCard);
 
-    // Gestión: acciones secundarias, discretas, abajo (la ficha queda limpia)
-    var mgmt = el("div", "lib-head");
-    mgmt.style.cssText += ";opacity:0.75;flex-wrap:wrap";
+    // Gestión secundaria, discreta
+    var mgmt = el("div", "lib-detail-actions");
     var metaBtn = el("button", "lib-btn", "Buscar ficha");
     metaBtn.type = "button";
     metaBtn.addEventListener("click", function () { openMetaSearch(b); });
@@ -840,11 +899,9 @@
     mgmt.appendChild(el("span", "lib-spacer"));
     var del = el("button", "lib-btn lib-btn-danger", "Eliminar");
     del.type = "button";
-    del.addEventListener("click", function () {
-      confirmDeleteBook(b);
-    });
+    del.addEventListener("click", function () { confirmDeleteBook(b); });
     mgmt.appendChild(del);
-    page.appendChild(mgmt);
+    wrap.appendChild(mgmt);
   }
 
   // Búsqueda de ficha (Google Books + OpenLibrary) con candidatas elegibles
@@ -1004,59 +1061,154 @@
     fill();
   }
 
-  // ---------- export / import (solo metadatos; los ficheros se re-suben) ----------
+  // ---------- export / import total (metadatos + progreso; los ficheros se re-suben) ----------
 
   function exportLibrary() {
-    var data = JSON.stringify({ app: "indexly-readly", version: 1, exportedAt: new Date().toISOString(), books: booksCache || [] }, null, 2);
+    var books = booksCache || [];
+    if (!books.length) { api.showToast("Nada que exportar: la biblioteca está vacía", "warning"); return; }
+    var data = JSON.stringify({ app: "indexly-readly", version: 2, exportedAt: new Date().toISOString(), count: books.length, books: books }, null, 2);
     var blob = new Blob([data], { type: "application/json" });
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    a.download = "readly-" + new Date().toISOString().slice(0, 10) + ".json";
+    a.download = "readly-backup-" + new Date().toISOString().slice(0, 10) + ".json";
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    api.showToast(books.length === 1 ? "1 libro exportado" : books.length + " libros exportados", "success");
+  }
+
+  function bookKey(b) { return normStr(b.title) + "|" + normStr(b.author || ""); }
+
+  // Sanea un registro importado y conserva ajustes + progreso; devuelve null si no es válido
+  function sanitizeImportedBook(x) {
+    if (!x || typeof x.title !== "string" || !x.title.trim()) return null;
+    return {
+      kind: (x.kind === "pdf" || x.kind === "txt") ? x.kind : "epub",
+      fileName: typeof x.fileName === "string" && x.fileName ? x.fileName : String(x.title).slice(0, 200) + ".epub",
+      title: String(x.title).slice(0, 200),
+      author: typeof x.author === "string" ? x.author.slice(0, 200) : "",
+      year: typeof x.year === "string" ? x.year.slice(0, 4) : "",
+      pages: typeof x.pages === "number" ? x.pages : null,
+      publisher: typeof x.publisher === "string" ? x.publisher.slice(0, 200) : "",
+      description: typeof x.description === "string" ? x.description.slice(0, 8000) : "",
+      cover: typeof x.cover === "string" ? x.cover.slice(0, 2000) : "",
+      status: STATUSES.some(function (s) { return s.id === x.status; }) ? x.status : "todo",
+      addedAt: typeof x.addedAt === "number" ? x.addedAt : Date.now(),
+      progress: (x.progress && typeof x.progress === "object") ? x.progress : null,
+      sources: Array.isArray(x.sources) ? x.sources.filter(function (s) { return s && typeof s.itemTitle === "string"; }).slice(0, 50) : [],
+      theme: THEMES.indexOf(x.theme) >= 0 ? x.theme : undefined,
+      fontSize: (typeof x.fontSize === "number" && x.fontSize >= 80 && x.fontSize <= 220) ? x.fontSize : undefined,
+      spread: (x.spread === "auto" || x.spread === "none") ? x.spread : undefined,
+      hideNav: typeof x.hideNav === "boolean" ? x.hideNav : undefined,
+    };
+  }
+
+  function applyImportedFields(target, clean) {
+    ["kind", "fileName", "title", "author", "year", "pages", "publisher", "description",
+     "cover", "status", "addedAt", "progress", "sources"].forEach(function (k) { target[k] = clean[k]; });
+    if (clean.theme !== undefined) target.theme = clean.theme;
+    if (clean.fontSize !== undefined) target.fontSize = clean.fontSize;
+    if (clean.spread !== undefined) target.spread = clean.spread;
+    if (clean.hideNav !== undefined) target.hideNav = clean.hideNav;
   }
 
   function importLibrary() {
     var fi = document.createElement("input");
     fi.type = "file";
     fi.accept = ".json,application/json";
+    fi.style.cssText = "position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0";
+    document.body.appendChild(fi);
     fi.addEventListener("change", function () {
       var f = fi.files && fi.files[0];
+      try { fi.remove(); } catch (e) { if (fi.parentNode) fi.parentNode.removeChild(fi); }
       if (!f) return;
-      f.text().then(function (txt) {
-        var parsed = JSON.parse(txt);
+      blobToText(f).then(function (txt) {
+        var parsed;
+        try { parsed = JSON.parse(txt); } catch (e) { throw new Error("El archivo no es un JSON válido"); }
         var list = Array.isArray(parsed) ? parsed : parsed.books;
         if (!Array.isArray(list)) throw new Error("El archivo no contiene una biblioteca (books[])");
-        list = list.filter(function (x) { return x && typeof x.title === "string"; });
-        if (!list.length) throw new Error("El archivo no contiene libros válidos");
-        api.modal({
-          title: "Importar biblioteca",
-          html: "<p>Se fusionarán " + list.length + " registros (los ficheros hay que volver a añadirlos: el export guarda solo metadatos y progreso). ¿Continuar?</p>",
-          actions: [
-            { label: "Cancelar" },
-            { label: "Importar", primary: true, onClick: function () {
-              list.forEach(function (x) {
-                if (booksCache.some(function (b) { return normStr(b.title) === normStr(x.title) && (b.author || "") === (x.author || ""); })) return;
-                booksCache.push({
-                  id: "b" + Date.now() + Math.random().toString(36).slice(2, 6),
-                  kind: x.kind || "epub", fileName: x.fileName || x.title + ".epub",
-                  title: String(x.title).slice(0, 200), author: x.author || "", year: x.year || "",
-                  pages: x.pages || null, publisher: x.publisher || "", description: x.description || "",
-                  cover: x.cover || "", status: STATUSES.some(function (s) { return s.id === x.status; }) ? x.status : "todo",
-                  addedAt: x.addedAt || Date.now(), progress: x.progress || null,
-                  sources: Array.isArray(x.sources) ? x.sources : [],
-                });
-              });
-              saveBooks();
-              api.showToast("Biblioteca importada", "success");
-              go("library");
-            } },
-          ],
+        var clean = list.map(sanitizeImportedBook).filter(Boolean);
+        if (!clean.length) throw new Error("El archivo no contiene libros válidos");
+        var fresh = [];
+        var dups = [];
+        clean.forEach(function (x) {
+          var hit = (booksCache || []).filter(function (b) { return bookKey(b) === bookKey(x); });
+          if (hit.length) dups.push({ incoming: x, existing: hit[0] });
+          else fresh.push(x);
         });
-      }).catch(function (err) { api.showToast("Import falló: " + err.message, "error", 5000); });
+        function doMerge() {
+          fresh.forEach(function (x) {
+            var rec = { id: "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10) };
+            applyImportedFields(rec, x);
+            booksCache.push(rec);
+          });
+          saveBooks();
+          api.showToast(fresh.length === 1 ? "1 libro importado (se conservó el resto)" : fresh.length + " libros importados (se conservó el resto)", "success");
+          go("library");
+        }
+        function doOverwrite() {
+          dups.forEach(function (d) { applyImportedFields(d.existing, d.incoming); });
+          fresh.forEach(function (x) {
+            var rec = { id: "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10) };
+            applyImportedFields(rec, x);
+            booksCache.push(rec);
+          });
+          saveBooks();
+          api.showToast("Biblioteca importada: " + fresh.length + " nuevos, " + dups.length + " actualizados", "success");
+          go("library");
+        }
+        // Resumen visual: nuevos frente a duplicados
+        var rows = clean.slice(0, 30).map(function (x) {
+          var isDup = dups.some(function (d) { return d.incoming === x; });
+          return '<div class="lib-imp-row"><span class="' + (isDup ? "lib-imp-dup" : "lib-imp-new") + '">' +
+            (isDup ? "Existe" : "Nuevo") + '</span><span>' + esc(x.title).slice(0, 80) +
+            (x.author ? ' <small>· ' + esc(x.author).slice(0, 60) + "</small>" : "") + "</span></div>";
+        }).join("");
+        if (clean.length > 30) rows += '<p style="margin:4px 0 0;font-size:11px;color:#64748b">…y ' + (clean.length - 30) + " más.</p>";
+        var note = "<p style=\"margin:8px 0 0;font-size:11.5px;color:#64748b\">El backup guarda libros, ajustes y progreso de lectura. Los ficheros (EPUB/PDF/TXT) hay que volver a añadirlos.</p>";
+        if (!dups.length) {
+          api.modal({
+            title: "Importar biblioteca",
+            html: "<p>" + fresh.length + (fresh.length === 1 ? " libro nuevo" : " libros nuevos") + ", ninguno duplicado. ¿Continuar?</p><div class=\"lib-imp-list\">" + rows + "</div>" + note,
+            actions: [
+              { label: "Cancelar" },
+              { label: "Importar", primary: true, onClick: doMerge },
+            ],
+          });
+        } else {
+          // Hay solape: preguntar antes de sobreescribir nada
+          api.modal({
+            title: "Importar con duplicados",
+            html: "<p><strong>" + dups.length + "</strong> " + (dups.length === 1 ? "ya existe en tu biblioteca" : "ya existen en tu biblioteca") +
+              " y <strong>" + fresh.length + "</strong> " + (fresh.length === 1 ? "es nuevo" : "son nuevos") +
+              ". ¿Qué hago con " + (dups.length === 1 ? "el duplicado" : "los duplicados") + "?</p><div class=\"lib-imp-list\">" + rows + "</div>" + note,
+            actions: [
+              { label: "Cancelar" },
+              { label: fresh.length ? ("Añadir solo nuevos (" + fresh.length + ")") : "Conservar los míos", primary: true, onClick: function () {
+                if (!fresh.length) { api.showToast("Sin cambios: se conservaron tus libros", "info"); return; }
+                doMerge();
+              } },
+              { label: "Sobreescribir duplicados", danger: true, onClick: function () {
+                // Segunda confirmación: la sobreescritura no se puede deshacer
+                api.modal({
+                  title: "¿Sobreescribir?",
+                  html: "<p>Se reemplazarán los datos de <strong>" + dups.length + "</strong> " +
+                    (dups.length === 1 ? "libro (ficha, ajustes y progreso)" : "libros (ficha, ajustes y progreso)") +
+                    " con los del archivo. Tus ficheros guardados se conservan. Esta acción no se puede deshacer.</p>",
+                  actions: [
+                    { label: "Volver" },
+                    { label: "Sí, sobreescribir", danger: true, onClick: doOverwrite },
+                  ],
+                });
+              } },
+            ],
+          });
+        }
+      }).catch(function (err) { api.showToast("No se pudo importar: " + (err && err.message || err), "error", 5000); });
     });
-    fi.click();
+    try { fi.click(); } catch (e) {
+      try { fi.remove(); } catch (_e) {}
+    }
   }
 
   // ---------- lector ----------
@@ -1130,8 +1282,45 @@
     });
   }
 
-  function buildOverlay(book, onReady) {
+  function isTouchDevice() {
+    try {
+      if (typeof window !== "undefined" && window.matchMedia) {
+        if (window.matchMedia("(hover: none) and (pointer: coarse)").matches) return true;
+        if (window.matchMedia("(hover: none)").matches && ("ontouchstart" in window || (navigator && navigator.maxTouchPoints > 0))) return true;
+      }
+      if (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0 && ("ontouchstart" in window)) return true;
+    } catch {}
+    return false;
+  }
+
+  function blobToArrayBuffer(blob) {
+    if (blob.arrayBuffer) return blob.arrayBuffer();
+    return new Promise(function (resolve, reject) {
+      try {
+        var fr = new FileReader();
+        fr.onload = function () { resolve(fr.result); };
+        fr.onerror = function () { reject(fr.error || new Error("No se pudo leer el fichero")); };
+        fr.readAsArrayBuffer(blob);
+      } catch (e) { reject(e); }
+    });
+  }
+
+  function blobToText(blob) {
+    if (blob.text) return blob.text();
+    return new Promise(function (resolve, reject) {
+      try {
+        var fr = new FileReader();
+        fr.onload = function () { resolve(String(fr.result || "")); };
+        fr.onerror = function () { reject(fr.error || new Error("No se pudo leer el fichero")); };
+        fr.readAsText(blob);
+      } catch (e) { reject(e); }
+    });
+  }
+
+  function buildOverlay(book, onReady, opts) {
     var overlay = el("div", "lib-reader");
+    if (isTouchDevice()) overlay.classList.add("is-touch");
+    if (opts && opts.noNav) overlay.classList.add("lib-nav-off");
     var top = el("div", "lib-reader-top");
     var close = el("button", "lib-btn", "✕");
     close.type = "button";
@@ -1143,8 +1332,21 @@
     top.appendChild(info);
     top.appendChild(el("span", "lib-spacer"));
     var tools = el("div", "lib-reader-tools");
+    // Botón sutil para ocultar/mostrar el panel de ajustes (temas, letra, páginas, índice)
+    var toolsToggle = el("button", "lib-btn lib-tools-toggle", "···");
+    toolsToggle.type = "button";
+    toolsToggle.title = "Mostrar u ocultar ajustes";
+    toolsToggle.setAttribute("aria-label", "Mostrar u ocultar el panel de ajustes");
+    top.appendChild(toolsToggle);
+    // Opción móvil para quitar/poner las flechas de movimiento (persistente por libro)
+    var hideNav = el("button", "lib-btn lib-hide-nav", "Sin flechas");
+    hideNav.type = "button";
+    hideNav.title = "Quitar o mostrar las flechas de página";
+    hideNav.setAttribute("aria-label", "Quitar o mostrar las flechas de página");
+    top.appendChild(hideNav);
     top.appendChild(tools);
-      // Móvil: tapzones de borde + flechas flotantes (solo EPUB; el EPUB las muestra)
+      var body = el("div", "lib-reader-body");
+      // Móvil: tapzones de borde + flechas flotantes (solo EPUB; en PDF/TXT el overlay lleva lib-nav-off)
       var tapL = el("div", "lib-tapzone lib-tapzone-left");
       var tapR = el("div", "lib-tapzone lib-tapzone-right");
       var arrL = el("button", "lib-nav-arrow lib-nav-left", "‹");
@@ -1153,10 +1355,7 @@
       var arrR = el("button", "lib-nav-arrow lib-nav-right", "›");
       arrR.type = "button";
       arrR.setAttribute("aria-label", "Página siguiente");
-      // Botón para ocultar/mostrar las flechas en móvil (persistente por libro)
-      var hideNav = el("button", "lib-btn lib-hide-nav", "Ocultar flechas");
-      hideNav.type = "button";
-      body.appendChild(tapL); body.appendChild(tapR); body.appendChild(arrL); body.appendChild(arrR); body.appendChild(hideNav);
+      body.appendChild(tapL); body.appendChild(tapR); body.appendChild(arrL); body.appendChild(arrR);
       overlay.appendChild(top);
       overlay.appendChild(body);
     var bottom = el("div", "lib-reader-bottom");
@@ -1182,7 +1381,40 @@
       else if (e.key === "ArrowLeft") { e.preventDefault(); reader.rendition.prev(); }
     };
     document.addEventListener("keydown", keyHandler);
-    reader = { overlay: overlay, top: top, tools: tools, info: info, body: body, fill: fill, pctLbl: pctLbl, pageLbl: pageLbl, bookId: book.id, escHandler: escHandler, keyHandler: keyHandler, url: null, lastProgress: null, updateFromLocation: null, locationsReady: false, tapL: tapL, tapR: tapR, arrL: arrL, arrR: arrR, hideNav: hideNav };
+    reader = { overlay: overlay, top: top, tools: tools, toolsToggle: toolsToggle, info: info, body: body, fill: fill, pctLbl: pctLbl, pageLbl: pageLbl, bookId: book.id, escHandler: escHandler, keyHandler: keyHandler, url: null, lastProgress: null, updateFromLocation: null, locationsReady: false, tapL: tapL, tapR: tapR, arrL: arrL, arrR: arrR, hideNav: hideNav, navHidden: !!book.hideNav, toolsHidden: false };
+    // Panel de ajustes colapsable (persistente global); en táctil empieza oculto para dejar sitio a la lectura
+    try {
+      var storedTools = localStorage.getItem("readly_tools_hidden");
+      reader.toolsHidden = storedTools == null ? isTouchDevice() : storedTools === "1";
+    } catch (e) { reader.toolsHidden = isTouchDevice(); }
+    (function paintTools() {
+      overlay.classList.toggle("lib-tools-hidden", !!reader.toolsHidden);
+      toolsToggle.style.opacity = reader.toolsHidden ? ".45" : ".95";
+      toolsToggle.title = reader.toolsHidden ? "Mostrar ajustes" : "Ocultar ajustes";
+    })();
+    reader.paintTools = function () {
+      overlay.classList.toggle("lib-tools-hidden", !!reader.toolsHidden);
+      toolsToggle.style.opacity = reader.toolsHidden ? ".45" : ".95";
+      toolsToggle.title = reader.toolsHidden ? "Mostrar ajustes" : "Ocultar ajustes";
+    };
+    toolsToggle.addEventListener("click", function () {
+      reader.toolsHidden = !reader.toolsHidden;
+      try { localStorage.setItem("readly_tools_hidden", reader.toolsHidden ? "1" : "0"); } catch (e) {}
+      reader.paintTools();
+    });
+    // Flechas de movimiento: quitar/poner (persistente por libro)
+    reader.applyNavPref = function () {
+      var hide = !!reader.navHidden;
+      [tapL, tapR, arrL, arrR].forEach(function (n) { if (n) n.style.display = hide ? "none" : ""; });
+      hideNav.textContent = hide ? "Con flechas" : "Sin flechas";
+    };
+    hideNav.addEventListener("click", function () {
+      reader.navHidden = !reader.navHidden;
+      reader.applyNavPref();
+      var cur = findBook(book.id);
+      if (cur) { cur.hideNav = reader.navHidden; saveBooks(); }
+    });
+    reader.applyNavPref();
     if (onReady) onReady(body);
     return { overlay: overlay, body: body, tools: tools, info: info, fill: fill, pctLbl: pctLbl };
   }
@@ -1211,7 +1443,7 @@
     var ui = buildOverlay(book);
     setProgress(book.progress && book.progress.percentage || 0, "Cargando lector…");
     loadEpubJs().then(function () {
-      return blob.arrayBuffer();
+      return blobToArrayBuffer(blob);
     }).then(function (buf) {
       if (!reader || reader.bookId !== book.id) return; // se cerró mientras cargaba
       var epubBook = window.ePub(buf);
@@ -1283,21 +1515,37 @@
 
       makeRendition(book, epubBook, view, book.progress && book.progress.cfi);
 
-      // Temas (claro / sépia / oscuro)
+      // Temas (claro / sépia / oscuro) con estado activo visible
       var THEME_LABELS = { sepia: "Sépia", light: "Claro", dark: "Oscuro" };
+      var themeBtns = {};
       THEMES.forEach(function (t) {
-        var tb = el("button", "lib-btn", THEME_LABELS[t]);
+        var tb = el("button", "lib-btn" + (reader.themeName === t ? " lib-btn-primary" : ""), THEME_LABELS[t]);
         tb.type = "button";
         tb.addEventListener("click", function () { if (reader.applyTheme) reader.applyTheme(t); });
+        themeBtns[t] = tb;
         ui.tools.appendChild(tb);
       });
+      reader.markThemeBtns = function (name) {
+        Object.keys(themeBtns).forEach(function (k) {
+          themeBtns[k].classList.toggle("lib-btn-primary", k === name);
+        });
+      };
+      reader.markThemeBtns(reader.themeName);
       var fsBtn = el("button", "lib-btn", "A −");
       fsBtn.type = "button";
-      fsBtn.addEventListener("click", function () { if (reader.applyFontSize) reader.applyFontSize(); });
+      fsBtn.title = "Reducir letra";
+      fsBtn.setAttribute("aria-label", "Reducir tamaño de letra");
+      fsBtn.addEventListener("click", function () { if (reader.applyFontSize) reader.applyFontSize(-10); });
       var fsBtn2 = el("button", "lib-btn", "A +");
       fsBtn2.type = "button";
-      fsBtn2.addEventListener("click", function () { if (reader.applyFontSize) reader.applyFontSize(); });
+      fsBtn2.title = "Aumentar letra";
+      fsBtn2.setAttribute("aria-label", "Aumentar tamaño de letra");
+      fsBtn2.addEventListener("click", function () { if (reader.applyFontSize) reader.applyFontSize(10); });
+      var fontLbl = el("small", "", (reader.fontSize || 100) + "%");
+      fontLbl.style.cssText = "color:#64748b;min-width:42px;text-align:center";
+      reader.fontLbl = fontLbl;
       ui.tools.appendChild(fsBtn);
+      ui.tools.appendChild(fontLbl);
       ui.tools.appendChild(fsBtn2);
 
       // 1 o 2 páginas (spread)
@@ -1327,7 +1575,7 @@
           var b = el("button", "", item.label && item.label.trim() ? item.label.trim() : "Capítulo");
           b.type = "button";
           b.addEventListener("click", function () {
-            rendition.display(item.href).catch(function () {});
+            if (reader && reader.rendition) reader.rendition.display(item.href).catch(function () {});
             toc.classList.remove("open");
           });
           toc.appendChild(b);
@@ -1365,26 +1613,46 @@
     window.addEventListener("orientationchange", resizeHandler);
     reader.resizeHandler = resizeHandler;
 
-    rendition.themes.register("light", { body: { background: "#faf9f5", color: "#1a1a1a" } });
-    rendition.themes.register("sepia", { body: { background: "#f4ecd8", color: "#3b3021" } });
-    rendition.themes.register("dark", { body: { background: "#0d1017", color: "#c9d1d9" } });
-    rendition.themes.select(reader.themeName || "sepia");
+    var THEME_BG = { light: "#faf9f5", sepia: "#f4ecd8", dark: "#0d1017" };
+    var THEME_FG = { light: "#1a1a1a", sepia: "#3b3021", dark: "#c9d1d9" };
+    function paintTheme(name) {
+      try {
+        rendition.themes.register(name, {
+          body: { background: THEME_BG[name] + " !important", color: THEME_FG[name] + " !important" },
+          "p, div, span, h1, h2, h3, h4, h5, h6, li, blockquote": { color: THEME_FG[name] + " !important" },
+          "a, a *": { color: (name === "dark" ? "#a78bfa" : "#0e7490") + " !important" },
+        });
+      } catch (e) {
+        rendition.themes.register(name, { body: { background: THEME_BG[name], color: THEME_FG[name] } });
+      }
+      rendition.themes.select(name);
+      try { rendition.themes.override("background", THEME_BG[name], true); } catch (e) {}
+      try { rendition.themes.override("color", THEME_FG[name], true); } catch (e) {}
+    }
+    ["light", "sepia", "dark"].forEach(function (t) { paintTheme(t); });
+    paintTheme(reader.themeName || "sepia");
     rendition.themes.fontSize((reader.fontSize || 100) + "%");
-    view.style.background = reader.themeName === "light" ? "#faf9f5" : (reader.themeName === "sepia" ? "#f4ecd8" : "#0d1017");
+    view.style.background = THEME_BG[reader.themeName] || THEME_BG.sepia;
+    if (reader.markThemeBtns) reader.markThemeBtns(reader.themeName);
 
     function applyTheme(name) {
+      if (THEMES.indexOf(name) < 0) return;
       reader.themeName = name;
-      if (reader.rendition) reader.rendition.themes.select(name);
-      if (reader.view) reader.view.style.background = name === "light" ? "#faf9f5" : (name === "sepia" ? "#f4ecd8" : "#0d1017");
+      if (reader.rendition) paintTheme(name);
+      if (reader.view) reader.view.style.background = THEME_BG[name] || THEME_BG.sepia;
+      if (reader.markThemeBtns) reader.markThemeBtns(name);
       var cur = findBook(book.id);
       if (cur) { cur.theme = name; saveBooks(); }
     }
     reader.applyTheme = applyTheme;
 
-    function applyFontSize() {
-      if (reader.rendition) reader.rendition.themes.fontSize((reader.fontSize || 100) + "%");
+    function applyFontSize(delta) {
+      var next = Math.max(80, Math.min(220, (reader.fontSize || 100) + (typeof delta === "number" ? delta : 0)));
+      reader.fontSize = next;
+      if (reader.rendition) reader.rendition.themes.fontSize(next + "%");
+      if (reader.fontLbl) reader.fontLbl.textContent = next + "%";
       var cur = findBook(book.id);
-      if (cur) { cur.fontSize = reader.fontSize; saveBooks(); }
+      if (cur) { cur.fontSize = next; saveBooks(); }
     }
     reader.applyFontSize = applyFontSize;
 
@@ -1402,13 +1670,9 @@
       if (reader.updateFromLocation) reader.updateFromLocation(location);
     });
 
-    // Móvil: tapzones de borde + flechas flotantes (visibles solo en EPUB por CSS media query;
-    // los handlers existen siempre y navegan con la rendition activa)
-    function applyNavPref() {
-      var hide = !!reader.navHidden;
-      [reader.tapL, reader.tapR, reader.arrL, reader.arrR].forEach(function (n) { if (n) n.style.display = hide ? "none" : ""; });
-      if (reader.hideNav) reader.hideNav.textContent = hide ? "Mostrar flechas" : "Ocultar flechas";
-    }
+    // Móvil: tapzones de borde + flechas flotantes (solo EPUB; el botón «Sin flechas»
+    // vive en la barra superior y lo cablea buildOverlay). Aquí solo se cablean las
+    // zonas/flechas a la rendition activa y se sincroniza la preferencia del libro.
     if (reader.tapL && !reader.tapL._wired) {
       reader.tapL._wired = true;
       var goPrev = function (e) { e.preventDefault(); if (reader.rendition) reader.rendition.prev(); };
@@ -1417,18 +1681,11 @@
       reader.tapR.addEventListener("click", goNext);
       reader.arrL.addEventListener("click", goPrev);
       reader.arrR.addEventListener("click", goNext);
-      if (reader.hideNav) {
-        reader.hideNav.addEventListener("click", function () {
-          reader.navHidden = !reader.navHidden;
-          applyNavPref();
-          var cur = findBook(book.id);
-          if (cur) { cur.hideNav = reader.navHidden; saveBooks(); }
-        });
-      }
     }
     reader.navHidden = !!book.hideNav;
-    applyNavPref();
-    rendition.display(target).then(function () {
+    if (reader.applyNavPref) reader.applyNavPref();
+    var startTarget = startCFI || undefined;
+    (startTarget ? rendition.display(startTarget) : rendition.display()).then(function () {
       if (book.progress && book.progress.percentage) setProgress(book.progress.percentage, book.progress.chapter || "");
     }).catch(function () {
       // CFI inválido (p. ej. de otro fichero): al principio
@@ -1458,8 +1715,13 @@
     if (reader.toc) reader.body.appendChild(reader.toc);
   }
 
+  var TXT_THEMES = {
+    sepia: { bg: "#f4ecd8", fg: "#3b3021" },
+    light: { bg: "#faf9f5", fg: "#1a1a1a" },
+    dark: { bg: "#0d1017", fg: "#c9d1d9" },
+  };
   function openSimpleReader(book, blob) {
-    var ui = buildOverlay(book);
+    var ui = buildOverlay(book, null, { noNav: true });
     if (book.kind === "pdf") {
       var url = URL.createObjectURL(blob);
       reader.url = url;
@@ -1469,12 +1731,64 @@
       ui.body.appendChild(frame);
       setProgress(0, "PDF — usa el visor del navegador");
     } else {
-      // TXT: <pre> con scroll; progreso por offset con throttle (no escribir en cada tick)
-      blob.text().then(function (txt) {
-        if (!reader) return;
+      // TXT: vista con scroll + temas y letra (igual que EPUB), progreso por offset con throttle
+      var txtTheme = book.theme && TXT_THEMES[book.theme] ? book.theme : "dark";
+      var txtSize = book.fontSize || 100;
+      var txtView = null;
+      function paintTxt() {
+        if (!txtView) return;
+        var t = TXT_THEMES[txtTheme] || TXT_THEMES.dark;
+        var px = Math.round(14 * (txtSize / 100));
+        txtView.style.background = t.bg;
+        txtView.style.color = t.fg;
+        txtView.style.fontSize = px + "px";
+      }
+      var tBtns = {};
+      THEMES.forEach(function (t) {
+        var tb = el("button", "lib-btn" + (txtTheme === t ? " lib-btn-primary" : ""), t === "sepia" ? "Sépia" : (t === "light" ? "Claro" : "Oscuro"));
+        tb.type = "button";
+        tb.addEventListener("click", function () {
+          txtTheme = t;
+          Object.keys(tBtns).forEach(function (k) { tBtns[k].classList.toggle("lib-btn-primary", k === t); });
+          paintTxt();
+          var cur = findBook(book.id);
+          if (cur) { cur.theme = t; saveBooks(); }
+        });
+        tBtns[t] = tb;
+        ui.tools.appendChild(tb);
+      });
+      var dec = el("button", "lib-btn", "A −");
+      dec.type = "button";
+      dec.setAttribute("aria-label", "Reducir tamaño de letra");
+      var inc = el("button", "lib-btn", "A +");
+      inc.type = "button";
+      inc.setAttribute("aria-label", "Aumentar tamaño de letra");
+      var sizeLbl = el("small", "", txtSize + "%");
+      sizeLbl.style.cssText = "color:#64748b;min-width:42px;text-align:center";
+      dec.addEventListener("click", function () {
+        txtSize = Math.max(80, Math.min(220, txtSize - 10));
+        sizeLbl.textContent = txtSize + "%";
+        paintTxt();
+        var cur = findBook(book.id);
+        if (cur) { cur.fontSize = txtSize; saveBooks(); }
+      });
+      inc.addEventListener("click", function () {
+        txtSize = Math.max(80, Math.min(220, txtSize + 10));
+        sizeLbl.textContent = txtSize + "%";
+        paintTxt();
+        var cur = findBook(book.id);
+        if (cur) { cur.fontSize = txtSize; saveBooks(); }
+      });
+      ui.tools.appendChild(dec);
+      ui.tools.appendChild(sizeLbl);
+      ui.tools.appendChild(inc);
+      blobToText(blob).then(function (txt) {
+        if (!reader || reader.bookId !== book.id) return;
         var view = el("div", "lib-reader-view");
-        view.style.cssText = "overflow:auto;padding:40px 20%;background:#0d1017;color:#c9d1d9;font-family:var(--font-mono,monospace);font-size:14px;line-height:1.7;white-space:pre-wrap";
+        view.style.cssText = "overflow:auto;padding:40px 18%;font-family:var(--font-mono,monospace);line-height:1.75;white-space:pre-wrap;transition:background .25s,color .25s";
         view.textContent = txt;
+        txtView = view;
+        paintTxt();
         ui.body.appendChild(view);
         setProgress(0, "TXT");
         var lastSave = 0;
@@ -1517,14 +1831,16 @@
             " gratis y sin claves; puedes rebuscarla desde la ficha.</li>" +
             "<li><strong>Leer</strong>: «Abrir libro» en la ficha o «Continuar (n%)». Dentro del" +
             " lector: índice de capítulos, tamaño de letra, temas claro/sépia/oscuro, barra de" +
-            " progreso y flechas del teclado (o espacio) para pasar página, y puedes elegir <strong>1 o 2 páginas</strong> por vista. Optimizado para móvil: barras compactas y botones táctiles. <kbd>Esc</kbd> cierra." +
+            " progreso y flechas del teclado (o espacio) para pasar página, y puedes elegir <strong>1 o 2 páginas</strong> por vista. El botón «···» oculta el panel de ajustes para leer sin distracciones, y en móvil «Sin flechas» quita las flechas de movimiento. Optimizado para móvil: barras compactas y botones táctiles. <kbd>Esc</kbd> cierra." +
             " La barra violeta bajo la carátula marca el progreso.</li>" +
             "<li><strong>Estados</strong>: Leyendo / Pendiente / Terminado / Abandonado, con filtros" +
             " en la biblioteca.</li>" +
             "<li><strong>Fuentes enlazadas</strong>: en cada ficha puedes enlazar elementos de tus" +
             " índices (por ejemplo la descarga original del Hub).</li>" +
-            "<li><strong>Backup</strong>: exportar/importar metadatos y progreso (los ficheros hay" +
-            " que volver a añadirlos).</li>" +
+            "<li><strong>Copia total</strong>: «⤓ Exportar» guarda todos tus libros, ajustes y" +
+            " progreso en un JSON; «⤒ Importar» los restaura y te avisa si algún libro ya existe" +
+            " (elige entre añadir solo los nuevos o sobreescribir duplicados). Los ficheros" +
+            " hay que volver a añadirlos.</li>" +
             "</ul>" +
             "<p><strong>Privacidad</strong>: biblioteca, ficheros y progreso viven en tu navegador." +
             " Solo se consultan Google Books/OpenLibrary para fichas y el CDN de epub.js la primera" +
