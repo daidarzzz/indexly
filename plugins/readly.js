@@ -1,7 +1,7 @@
 /* IndexLy Plugin
    id: readly
    name: ReadLy
-    version: 1.6.0
+    version: 1.7.1
    description: Tu biblioteca de libros dentro de IndexLy: añade tus EPUB, PDF y TXT, léalos en un lector a pantalla completa con temas, índice de capítulos y progreso guardado por página. La carátula se extrae del propio EPUB; ficha automática de Google Books como complemento. Todo local.
    permissions: network, ui, storage
 */
@@ -414,7 +414,9 @@
       ".lib-reader-view{position:absolute;inset:0;touch-action:pan-y;will-change:transform}",
       ".lib-swipe-anim{transition:transform .24s cubic-bezier(.2,.7,.3,1)}",
       ".lib-swipe-drag{cursor:grabbing}",
-      "@media (prefers-reduced-motion:reduce){.lib-swipe-anim{transition:none}}",
+      "@keyframes libShimmer{from{background-position:200% 0}to{background-position:-200% 0}}",
+      ".lib-reader-view.lib-wait{background-image:linear-gradient(100deg,transparent 42%,rgba(167,139,250,0.10) 50%,transparent 58%);background-size:200% 100%;animation:libShimmer 1.1s linear infinite}",
+      "@media (prefers-reduced-motion:reduce){.lib-swipe-anim{transition:none}.lib-reader-view.lib-wait{animation:none}}",
       ".lib-reader-bottom{display:flex;align-items:center;gap:12px;padding:8px 16px;border-top:1px solid #1e293b;background:#0a0f1c;flex-shrink:0}",
       ".lib-track{flex:1;height:4px;border-radius:999px;background:#141b29;overflow:hidden}",
       ".lib-track span{display:block;height:100%;background:#a78bfa;border-radius:999px;transition:width .2s}",
@@ -1257,6 +1259,17 @@
     if (!reader) return;
     var wasBookId = reader.bookId;
     if (reader.swipeDetach) { try { reader.swipeDetach(); } catch (e) { /* noop */ } }
+    if (reader.prefetchT) { try { clearTimeout(reader.prefetchT); } catch (e) {} }
+    // Resumen de latencia de giros (medición de la sesión, solo consola)
+    try {
+      var stats = reader.swipeState && reader.swipeState.navStats;
+      if (stats && stats.length) {
+        var same = stats.filter(function (s) { return !s.cross; }).map(function (s) { return s.ms; });
+        var cross = stats.filter(function (s) { return s.cross; }).map(function (s) { return s.ms; });
+        var avg = function (a) { return a.length ? Math.round(a.reduce(function (x, y) { return x + y; }, 0) / a.length) : 0; };
+        console.info("[ReadLy] giros: " + stats.length + " (misma sección Ø" + avg(same) + "ms, cambio de capítulo Ø" + avg(cross) + "ms)");
+      }
+    } catch (e) {}
     // Guarda el progreso final antes de destruir nada (el debounce puede perderlo)
     if (reader.lastProgress) {
       var cur = findBook(wasBookId);
@@ -1272,6 +1285,7 @@
     try { if (reader.book) reader.book.destroy(); } catch {}
     if (reader.url) { try { URL.revokeObjectURL(reader.url); } catch {} }
     if (reader.overlay && reader.overlay.parentNode) reader.overlay.parentNode.removeChild(reader.overlay);
+    unlockBodyScroll();
     reader = null;
     // Refresca la vista de debajo: el % nuevo debe verse en card/ficha al volver
     rerender();
@@ -1320,6 +1334,38 @@
         fr.readAsText(blob);
       } catch (e) { reject(e); }
     });
+  }
+
+  // Bloqueo de scroll del fondo mientras el lector está abierto (en iOS el
+  // arrastre se encadena a la página de detrás si no se congela)
+  var bodyScrollLock = null;
+  function lockBodyScroll() {
+    try {
+      var de = document.documentElement, bd = document.body;
+      bodyScrollLock = {
+        top: window.scrollY || window.pageYOffset || 0,
+        deOverflow: de.style.overflow, bdOverflow: bd.style.overflow,
+        bdPos: bd.style.position, bdTop: bd.style.top, bdWidth: bd.style.width,
+      };
+      de.style.overflow = "hidden";
+      bd.style.overflow = "hidden";
+      bd.style.position = "fixed";
+      bd.style.top = (-bodyScrollLock.top) + "px";
+      bd.style.width = "100%";
+    } catch (e) {}
+  }
+  function unlockBodyScroll() {
+    try {
+      if (!bodyScrollLock) return;
+      var top = bodyScrollLock.top;
+      document.documentElement.style.overflow = bodyScrollLock.deOverflow;
+      document.body.style.overflow = bodyScrollLock.bdOverflow;
+      document.body.style.position = bodyScrollLock.bdPos;
+      document.body.style.top = bodyScrollLock.bdTop;
+      document.body.style.width = bodyScrollLock.bdWidth;
+      bodyScrollLock = null;
+      window.scrollTo(0, top);
+    } catch (e) {}
   }
 
   function buildOverlay(book, onReady, opts) {
@@ -1377,13 +1423,14 @@
     bottom.appendChild(pageLbl);
     overlay.appendChild(bottom);
     document.body.appendChild(overlay);
+    lockBodyScroll();
     var escHandler = function (e) { if (e.key === "Escape") { e.preventDefault(); closeReader(); } };
     document.addEventListener("keydown", escHandler);
     // Navegación por teclado del lector: la rendition activa está en reader.rendition
     var keyHandler = function (e) {
       if (!reader || !reader.rendition) return;
-      if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); reader.rendition.next(); }
-      else if (e.key === "ArrowLeft") { e.preventDefault(); reader.rendition.prev(); }
+      if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); markNav("next"); reader.rendition.next(); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); markNav("prev"); reader.rendition.prev(); }
     };
     document.addEventListener("keydown", keyHandler);
     reader = { overlay: overlay, top: top, tools: tools, toolsToggle: toolsToggle, info: info, body: body, fill: fill, pctLbl: pctLbl, pageLbl: pageLbl, bookId: book.id, escHandler: escHandler, keyHandler: keyHandler, url: null, lastProgress: null, updateFromLocation: null, locationsReady: false, tapL: tapL, tapR: tapR, arrL: arrL, arrR: arrR, hideNav: hideNav, navHidden: !!book.hideNav, toolsHidden: false };
@@ -1445,6 +1492,43 @@
     cur.progress = progress;
     cur.status = cur.status === "todo" ? "reading" : cur.status;
     saveBooks();
+  }
+
+  // Marca el inicio de un giro de página para medir su latencia real
+  function markNav(dir) {
+    try {
+      if (!reader || !reader.swipeState) return;
+      var st = reader.swipeState, href = "";
+      try {
+        var loc = reader.rendition && reader.rendition.currentLocation();
+        href = (loc && loc.start && loc.start.href) || "";
+      } catch (e) {}
+      st.navHref = href;
+      st.navDir = dir;
+      st.navT0 = (window.performance && performance.now && performance.now()) || Date.now();
+    } catch (e) {}
+  }
+
+  // Precalienta los capítulos vecinos en idle: el giro entre capítulos solo paga
+  // crear el iframe + maquetar (el unzip/parseo ya está en caché). No toca el progreso.
+  function prefetchNeighbors(href) {
+    try {
+      var b = reader && reader.book;
+      if (!b || !b.spine || !b.spine.items || !href) return;
+      var items = b.spine.items, idx = -1;
+      for (var i = 0; i < items.length; i++) {
+        var ih = (items[i] && items[i].href) || "";
+        if (ih && (href === ih || href.indexOf(ih.split("/").pop()) >= 0)) { idx = i; break; }
+      }
+      if (idx < 0) return;
+      [idx - 1, idx + 1].forEach(function (j) {
+        if (j < 0 || j >= items.length) return;
+        try {
+          var p = items[j].load(b.load.bind(b));
+          if (p && p.catch) p.catch(function () {});
+        } catch (e) {}
+      });
+    } catch (e) {}
   }
 
   function openEpubReader(book, blob) {
@@ -1519,6 +1603,23 @@
           updatedAt: Date.now(),
         };
         if (reader.persistProgressSoon) reader.persistProgressSoon();
+        try {
+          // Latencia del giro que nos trajo aquí (misma sección vs. cambio de capítulo)
+          var sst = reader.swipeState;
+          if (sst && sst.navT0) {
+            var nowMs = (window.performance && performance.now && performance.now()) || Date.now();
+            var hrefNow = (location.start && location.start.href) || "";
+            sst.navStats = sst.navStats || [];
+            sst.navStats.push({ ms: Math.round(nowMs - sst.navT0), cross: hrefNow !== sst.navHref, dir: sst.navDir || "" });
+            if (sst.navStats.length > 60) sst.navStats.shift();
+            sst.navT0 = null;
+          }
+          // Precalienta capítulos vecinos en idle + re-cablea iframes visibles
+          if (reader.prefetchT) clearTimeout(reader.prefetchT);
+          var pbid = reader.bookId, phref = (location.start && location.start.href) || "";
+          reader.prefetchT = setTimeout(function () { if (reader && reader.bookId === pbid) prefetchNeighbors(phref); }, 1200);
+          if (reader.swipeWire) reader.swipeWire();
+        } catch (e) {}
       };
 
       makeRendition(book, epubBook, view, book.progress && book.progress.cfi);
@@ -1697,8 +1798,8 @@
     // zonas/flechas a la rendition activa y se sincroniza la preferencia del libro.
     if (reader.tapL && !reader.tapL._wired) {
       reader.tapL._wired = true;
-      var goPrev = function (e) { e.preventDefault(); if (reader.rendition) reader.rendition.prev(); };
-      var goNext = function (e) { e.preventDefault(); if (reader.rendition) reader.rendition.next(); };
+      var goPrev = function (e) { e.preventDefault(); markNav("prev"); if (reader.rendition) reader.rendition.prev(); };
+      var goNext = function (e) { e.preventDefault(); markNav("next"); if (reader.rendition) reader.rendition.next(); };
       reader.tapL.addEventListener("click", goPrev);
       reader.tapR.addEventListener("click", goNext);
       reader.arrL.addEventListener("click", goPrev);
@@ -1732,7 +1833,8 @@
   }
 
   function attachSwipeNav(book, rendition, view) {
-    var st = { pid: null, sx: 0, sy: 0, dx: 0, t0: 0, locked: false, vertical: false, anim: false, ateUntil: 0, edge: null, w: 0 };
+    var st = { pid: null, sx: 0, sy: 0, dx: 0, t0: 0, locked: false, vertical: false, anim: false, ateUntil: 0, edge: null, w: 0, touchType: null, tapTouch: false, navT0: null, navHref: "", navDir: "", navStats: [] };
+    reader.swipeState = st;
     function width() {
       try {
         var r = view.getBoundingClientRect();
@@ -1781,7 +1883,7 @@
     }
     function cancelDrag(snap) {
       if (st.pid == null && !st.anim) return;
-      st.pid = null; st.locked = false; st.vertical = false;
+      st.pid = null; st.locked = false; st.vertical = false; st.tapTouch = false;
       try { view.classList.remove("lib-swipe-drag"); } catch (e) {}
       if (snap !== false) setX(0, true);
       st.dx = 0;
@@ -1789,17 +1891,14 @@
     reader.swipeDetach = function () {
       cancelDrag(false);
       setX(0, false);
-      try { view.classList.remove("lib-swipe-drag"); view.classList.remove("lib-swipe-anim"); } catch (e) {}
+      try { view.classList.remove("lib-swipe-drag"); view.classList.remove("lib-swipe-anim"); view.classList.remove("lib-wait"); } catch (e) {}
     };
     reader.swipeCancel = function () { cancelDrag(true); };
 
-    function onDown(e) {
-      if (!reader || reader.swipeOn === false || st.anim) return;
-      if (st.pid != null) return; // un solo puntero
-      try { if (e.pointerType === "mouse" && e.button !== 0) return; } catch (err) {}
-      var x = e.clientX, y = e.clientY;
-      if (typeof x !== "number") return;
-      st.pid = e.pointerId;
+    // Núcleo compartido: Touch Events (iOS) y Pointer Events (ratón/stylus)
+    // alimentan la misma máquina. iOS ignora `touch-action`, así que el bloqueo
+    // vertical se hace con preventDefault() en touchmove no-pasivo.
+    function beginTrack(x, y) {
       st.sx = x; st.sy = y; st.dx = 0;
       st.t0 = Date.now();
       st.locked = false; st.vertical = false;
@@ -1809,39 +1908,29 @@
         st.edge = { start: !!(loc && loc.atStart), end: !!(loc && loc.atEnd) };
       } catch (err) { st.edge = { start: false, end: false }; }
     }
-    function onMove(e) {
-      if (e.pointerId !== st.pid || st.anim) return;
-      if (st.vertical) return;
-      var dx = e.clientX - st.sx, dy = e.clientY - st.sy;
+    function lockDrag(doc) {
+      st.locked = true;
+      try { view.classList.add("lib-swipe-drag"); } catch (err) {}
+      try { if (doc && doc.getSelection) doc.getSelection().removeAllRanges(); } catch (err) {}
+      userSelect(doc, "none");
+    }
+    function trackMove(dx, dy) {
       if (!st.locked) {
-        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-        if (Math.abs(dy) > Math.abs(dx) * 1.2) { st.vertical = true; st.pid = null; return; } // scroll vertical: no interferir
-        st.locked = true;
-        try { view.classList.add("lib-swipe-drag"); } catch (err) {}
-        try {
-          var d = (e.view && e.view.document) || null;
-          if (d && d.getSelection) d.getSelection().removeAllRanges();
-          userSelect(d, "none");
-        } catch (err) {}
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return "wait";
+        if (Math.abs(dy) > Math.abs(dx) * 1.2) return "vertical";
+        return "lock";
       }
-      // Resistencia elástica en los bordes del libro
+      return "locked";
+    }
+    function applyDrag(dx) {
       var rdx = dx;
       if ((dx > 0 && st.edge && st.edge.start) || (dx < 0 && st.edge && st.edge.end)) rdx = dx * 0.35;
       st.dx = rdx;
       setX(rdx, false);
-      try { e.preventDefault(); } catch (err) {}
     }
-    function onUp(e) {
-      if (e.pointerId !== st.pid) return;
-      var doc = null;
-      try { doc = (e.view && e.view.document) || null; } catch (err) {}
-      var wasLocked = st.locked, dx = st.dx, dt = Math.max(1, Date.now() - st.t0);
-      endDrag(doc);
-      if (!wasLocked) { st.dx = 0; return; } // fue un tap: lo gestionan tapzones/enlaces
-      st.ateUntil = Date.now() + 400; // suprime el click posterior al arrastre
-      var w = st.w || width();
-      var vel = dx / dt;
-      var thr = Math.max(72, w * 0.22);
+    function finishDrag() {
+      var dx = st.dx, dt = Math.max(1, Date.now() - st.t0), w = st.w || width();
+      var vel = dx / dt, thr = Math.max(72, w * 0.22);
       var dir = dx < 0 ? "next" : "prev";
       var blocked = (dir === "next" && st.edge && st.edge.end) || (dir === "prev" && st.edge && st.edge.start);
       st.dx = 0;
@@ -1851,6 +1940,51 @@
       }
       navigate(dir, w);
     }
+    // Tap táctil universal: izquierda 30% atrás, resto adelante (salvo enlaces),
+    // haya flechas o no. El ratón no usa esta vía (selección/enlaces intactos).
+    function tapAdvance(clientX) {
+      if (st.anim) return;
+      var w = st.w || width(), vx = 0;
+      try { vx = view.getBoundingClientRect().left || 0; } catch (e) {}
+      var dir = (clientX - vx) < w * 0.3 ? "prev" : "next";
+      var blocked = (dir === "next" && st.edge && st.edge.end) || (dir === "prev" && st.edge && st.edge.start);
+      if (blocked) return;
+      st.ateUntil = Date.now() + 400; // el click posterior no debe duplicar
+      markNav(dir);
+      try { if (dir === "next") rendition.next(); else rendition.prev(); } catch (e) {}
+    }
+    function onDown(e) {
+      if (!reader || reader.swipeOn === false || st.anim) return;
+      if (st.pid != null || st.touchActive) return;
+      try {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        // El táctil va por Touch Events (más fiable en iOS que los Pointer Events)
+        if (e.pointerType !== "mouse" && e.pointerType !== "pen" && (st.hasTouch || e.pointerType === "touch")) return;
+      } catch (err) {}
+      if (typeof e.clientX !== "number") return;
+      st.pid = e.pointerId;
+      beginTrack(e.clientX, e.clientY);
+    }
+    function onMove(e) {
+      if (st.touchActive || e.pointerId !== st.pid || st.anim) return;
+      if (st.vertical) return;
+      var r = trackMove(e.clientX - st.sx, e.clientY - st.sy);
+      if (r === "wait") return;
+      if (r === "vertical") { st.vertical = true; st.pid = null; return; }
+      if (r === "lock") { var dd = null; try { dd = (e.view && e.view.document) || null; } catch (err) {} lockDrag(dd); }
+      applyDrag(e.clientX - st.sx);
+      try { e.preventDefault(); } catch (err) {}
+    }
+    function onUp(e) {
+      if (st.touchActive || e.pointerId !== st.pid) return;
+      var doc = null;
+      try { doc = (e.view && e.view.document) || null; } catch (err) {}
+      var wasLocked = st.locked;
+      endDrag(doc);
+      if (!wasLocked) { st.dx = 0; return; } // click de ratón: enlaces/selección, sin avanzar
+      st.ateUntil = Date.now() + 400; // suprime el click posterior al arrastre
+      finishDrag();
+    }
     function onCancel(e) {
       if (e.pointerId !== st.pid) return;
       var doc = null;
@@ -1859,8 +1993,65 @@
       setX(0, true);
       st.dx = 0;
     }
+    function onTouchStart(e) {
+      if (!reader || reader.swipeOn === false || st.anim) return;
+      try { if (!e.changedTouches || e.changedTouches.length !== 1 || (e.touches && e.touches.length !== 1)) return; } catch (err) { return; }
+      st.hasTouch = true;
+      st.pid = null; // el táctil manda: invalida el tracking de Pointer Events
+      st.touchActive = true;
+      beginTrack(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+    }
+    function onTouchMove(e) {
+      if (!st.touchActive || st.anim) return;
+      var t = null;
+      try {
+        if (!e.changedTouches || e.changedTouches.length !== 1) { abortTouch(); return; }
+        t = e.changedTouches[0];
+      } catch (err) { return; }
+      // Bloquea cualquier scroll/bounce nativo dentro del libro
+      try { e.preventDefault(); } catch (err) {}
+      if (st.vertical) return;
+      var r = trackMove(t.clientX - st.sx, t.clientY - st.sy);
+      if (r === "wait") return;
+      if (r === "vertical") { st.vertical = true; st.touchActive = false; st.pid = null; return; }
+      if (r === "lock") { var d = null; try { d = (e.view && e.view.document) || null; } catch (err) {} lockDrag(d); }
+      applyDrag(t.clientX - st.sx);
+    }
+    function onTouchEnd(e) {
+      if (!st.touchActive) return;
+      var t = null;
+      try { t = e.changedTouches && e.changedTouches[0]; } catch (err) {}
+      var wasLocked = st.locked, dt = Math.max(1, Date.now() - st.t0);
+      var doc = null;
+      try { doc = (e.view && e.view.document) || null; } catch (err) {}
+      st.touchActive = false; st.pid = null;
+      endDrag(doc);
+      if (st.anim) return;
+      if (!wasLocked) {
+        if (t && dt < 600 && !isLinkTarget(t.target)) tapAdvance(t.clientX);
+        return;
+      }
+      st.ateUntil = Date.now() + 400;
+      finishDrag();
+    }
+    function abortTouch() {
+      st.touchActive = false; st.pid = null;
+      try { view.classList.remove("lib-swipe-drag"); } catch (e) {}
+      setX(0, true);
+      st.dx = 0;
+    }
+    function onTouchCancel(e) {
+      if (!st.touchActive) return;
+      var doc = null;
+      try { doc = (e.view && e.view.document) || null; } catch (err) {}
+      st.touchActive = false; st.pid = null;
+      endDrag(doc);
+      setX(0, true);
+      st.dx = 0;
+    }
     function navigate(dir, w) {
       if (st.anim) return;
+      markNav(dir);
       if (reducedMotion()) {
         try { if (dir === "next") rendition.next(); else rendition.prev(); } catch (e) {}
         setX(0, false);
@@ -1871,7 +2062,8 @@
       setX(outX, true);
       afterTransition(240).then(function () {
         if (!reader || reader.rendition !== rendition) return null;
-        var p = nextRelocated(900);
+        try { view.classList.add("lib-wait"); } catch (e) {}
+        var p = nextRelocated(600);
         try { if (dir === "next") rendition.next(); else rendition.prev(); } catch (e) {}
         return p;
       }).then(function (ok) {
@@ -1883,23 +2075,49 @@
         view.style.transform = "translate3d(0,0,0)";
         return afterTransition(240);
       }).then(function () {
-        try { view.classList.remove("lib-swipe-anim"); } catch (e) {}
+        try { view.classList.remove("lib-swipe-anim"); view.classList.remove("lib-wait"); } catch (e) {}
         view.style.transform = "";
         st.anim = false;
       });
     }
+    function isLinkTarget(t) {
+      try {
+        if (!t || !t.closest) return false;
+        return !!t.closest("a,button,input,select,textarea");
+      } catch (e) { return false; }
+    }
     function wireDoc(d) {
       if (!d || !d.documentElement || d.documentElement.__libSwipe) return;
       d.documentElement.__libSwipe = true;
-      try { d.documentElement.style.touchAction = "pan-y"; } catch (e) {}
+      try { d.documentElement.style.touchAction = "none"; } catch (e) {}
+      try { if (d.body) { d.body.style.overscrollBehavior = "none"; } } catch (e) {}
       d.addEventListener("click", function (ev) {
         if (Date.now() < st.ateUntil) { ev.preventDefault(); ev.stopPropagation(); }
       }, true);
+      // Touch Events no-pasivos: única vía fiable en iOS (ignora touch-action).
+      // El tap universal vive en onTouchEnd; el click solo se suprime tras arrastre.
+      var tOpts = { passive: false };
+      try { d.documentElement.addEventListener("touchstart", onTouchStart, tOpts); } catch (e) { try { d.documentElement.addEventListener("touchstart", onTouchStart); } catch (e2) {} }
+      try { d.addEventListener("touchmove", onTouchMove, tOpts); } catch (e) { try { d.addEventListener("touchmove", onTouchMove); } catch (e2) {} }
+      try { d.addEventListener("touchend", onTouchEnd); } catch (e) {}
+      try { d.addEventListener("touchcancel", onTouchCancel); } catch (e) {}
+      try { d.addEventListener("gesturestart", function (ev) { try { ev.preventDefault(); } catch (e) {} }); } catch (e) {}
       d.documentElement.addEventListener("pointerdown", onDown);
       d.addEventListener("pointermove", onMove);
       d.addEventListener("pointerup", onUp);
       d.addEventListener("pointercancel", onCancel);
     }
+    // Fallback: cablea los iframes visibles de la vista (por si el hook no cubre
+    // algún documento en esta versión de epub.js). Idempotente por __libSwipe.
+    reader.swipeWire = function () {
+      try {
+        if (!reader || !reader.view) return;
+        var frs = reader.view.querySelectorAll("iframe");
+        for (var i = 0; i < frs.length; i++) {
+          try { var dd = frs[i].contentDocument; if (dd) wireDoc(dd); } catch (e) {}
+        }
+      } catch (e) {}
+    };
     try {
       rendition.hooks.content.register(function (contents) {
         try {
@@ -2049,7 +2267,7 @@
             " gratis y sin claves; puedes rebuscarla desde la ficha.</li>" +
             "<li><strong>Leer</strong>: «Abrir libro» en la ficha o «Continuar (n%)». Dentro del" +
             " lector: índice de capítulos, tamaño de letra, temas claro/sépia/oscuro, barra de" +
-            " progreso y flechas del teclado (o espacio) para pasar página, y puedes elegir <strong>1 o 2 páginas</strong> por vista. El botón «···» oculta el panel de ajustes para leer sin distracciones, y en móvil «Sin flechas» oculta las flechas pero mantiene el toque en los bordes para pasar página. También puedes pasar página deslizando con el dedo o el ratón (botón «Deslizar»). Optimizado para móvil: barras compactas y botones táctiles. <kbd>Esc</kbd> cierra." +
+            " progreso y flechas del teclado (o espacio) para pasar página, y puedes elegir <strong>1 o 2 páginas</strong> por vista. El botón «···» oculta el panel de ajustes para leer sin distracciones, y en móvil «Sin flechas» oculta las flechas (el toque sigue pasando página). En táctil: toca a la izquierda para retroceder y en el resto para avanzar (los enlaces se respetan), o desliza con el dedo; el desplazamiento vertical está bloqueado para no mover la página sin querer. En escritorio también puedes arrastrar con el ratón (botón «Deslizar»). Optimizado para móvil: barras compactas y botones táctiles. <kbd>Esc</kbd> cierra." +
             " La barra violeta bajo la carátula marca el progreso.</li>" +
             "<li><strong>Estados</strong>: Leyendo / Pendiente / Terminado / Abandonado, con filtros" +
             " en la biblioteca.</li>" +
