@@ -3245,15 +3245,58 @@
   .footer-note { margin: var(--space-8) 0 0; text-align: center; color: var(--color-text-tertiary); font-size: var(--text-xs); }
   @media (max-width: 640px) {
     .Search { padding: var(--space-6) var(--space-4) var(--space-12); }
-    .index-manager-card { padding: var(--space-6); }
-    :global(.game-card) { flex-direction: column; align-items: stretch; }
-    :global(.magnet-link), :global(.no-magnet) { width: 100%; justify-content: center; }
+    .index-manager-card { padding: var(--space-4); border-radius: 14px; }
+    /* Entradas a 16px: evita el auto-zoom de Safari iOS al enfocar */
+    #search-input, .hub-search, .mapping-input, .plugin-url-input { font-size: 16px; }
+    #search-input { padding: 12px 44px 12px 40px; }
+    .search-hint { display: none; }
+    .search-wrap { margin-top: var(--space-6); }
+    /* Gestor: CTA principal a ancho completo y targets táctiles */
+    .manager-header { gap: var(--space-3); }
+    .manager-actions { width: 100%; }
+    .manager-actions .file-label { flex: 1 1 100%; justify-content: center; min-height: 42px; }
+    .manager-actions .action-btn { min-height: 36px; }
+    .drop-hint { text-align: center; }
+    .drop-hint kbd { display: none; }
+    /* Píldoras de fuente: compactas sin aplastar el switch */
+    :global(.index-pill) { padding: 8px 8px 8px 10px; gap: var(--space-2); }
+    :global(.index-avatar) { width: 36px; height: 36px; border-radius: 11px; font-size: 15px; }
+    :global(.index-text strong) { max-width: 18ch; }
+    :global(.index-pill-actions) { gap: 6px; }
+    :global(.index-switch) { width: 44px; height: 26px; }
+    :global(.index-switch .knob) { width: 20px; height: 20px; }
+    :global(.index-switch[aria-checked="true"] .knob) { left: 20px; }
+    /* Controles: todo a ancho completo con altura táctil */
     .controls { border-radius: 16px; padding: 8px; gap: 6px; }
     .controls-sep { display: none; }
     .filter-chips { order: 1; width: 100%; }
-    .filter-chips .chip { flex: 1; justify-content: center; }
-    .sort-select { order: 2; flex: 1; }
-    .view-toggle { order: 3; }
+    .filter-chips .chip { flex: 1; justify-content: center; min-height: 38px; }
+    .sort-select { order: 2; flex: 1; min-height: 38px; }
+    .view-toggle { order: 3; flex: 1 1 100%; }
+    .view-toggle .view-btn { flex: 1; justify-content: center; min-height: 38px; }
+    /* Resultados */
+    :global(.game-card) { flex-direction: column; align-items: stretch; gap: var(--space-3); }
+    :global(.magnet-link), :global(.no-magnet) { width: 100%; justify-content: center; min-height: 42px; }
+    :global(.results-grid.view-grid) { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    :global(.grid-body) { padding: 20px 12px 10px; }
+    :global(.grid-open) { min-height: 36px; }
+    /* Hub: pestañas con scroll horizontal en vez de apelotonarse */
+    .hub-tabs { flex: 1 1 100%; overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+    .hub-tabs::-webkit-scrollbar { display: none; }
+    .hub-tabs .chip { flex-shrink: 0; min-height: 36px; }
+    .hub-search { flex: 1 1 100%; min-height: 40px; }
+    :global(.hub-item .action-btn.secondary) { min-height: 34px; }
+    /* Plugins */
+    :global(.plx-chip) { min-height: 36px; }
+    :global(.plx-card-action) { min-height: 36px; }
+    /* Modales como bottom-sheet: más aire, scroll seguro y botones grandes */
+    .mapping-overlay { padding: 12px; align-items: flex-end; }
+    .mapping-dialog { padding: 18px; max-height: calc(100dvh - 24px); overflow-y: auto; border-radius: 16px; }
+    .mapping-actions { flex-wrap: wrap; }
+    .mapping-actions .mapping-btn { flex: 1; min-height: 42px; white-space: nowrap; }
+    :global(.io-list) { max-height: 38vh; }
+    #diff-list { max-height: 40vh; }
+    .bulk-actions { border-radius: 16px; }
   }
   /* Toasts — minimal, static (no animation) */
   :global(.toast-container) { position: fixed; bottom: 18px; right: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 100; pointer-events: none; }

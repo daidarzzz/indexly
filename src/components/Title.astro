@@ -190,8 +190,15 @@
   }
 
   @media (max-width: 640px) {
-    .nav { padding: var(--space-4) var(--space-4); }
-    .hero { padding: var(--space-12) var(--space-4) var(--space-6); }
+    .nav { padding: 12px var(--space-4); gap: var(--space-2); }
+    .nav-actions { gap: 0; flex-shrink: 0; }
+    .nav-link { padding: 8px; font-size: 12px; white-space: nowrap; }
+    .nav-actions .nav-link[href*="github"] { display: none; }
+    .logo-text { font-size: 15px; }
+    .hero { padding: var(--space-8) var(--space-4) var(--space-6); }
+    .hero h1 { font-size: 27px; }
+    .hero p { font-size: 13.5px; }
+    .hero-badge { font-size: 11px; }
     .logo-badge { display: none; }
   }
 </style>
