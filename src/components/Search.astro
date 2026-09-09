@@ -34,6 +34,23 @@
         <input type="file" id="json-input" accept=".json,.csv,.tsv,.yaml,.yml,.xml,.txt" multiple class="sr-only" />
       </div>
     </div>
+    <div class="src-tabs" role="tablist" aria-label="Secciones">
+      <button type="button" class="src-tab" role="tab" id="src-tab-fuentes" aria-selected="true" aria-controls="src-pane-fuentes" data-srctab="fuentes">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12H14l-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6l2 2h8a2 2 0 0 1 2 2v4Z"/><path d="M14 14v6H4a2 2 0 0 1-2-2v-6"/></svg>
+        Fuentes
+        <span id="src-count-fuentes" class="src-count" aria-hidden="true"></span>
+      </button>
+      <button type="button" class="src-tab" role="tab" id="src-tab-hub" aria-selected="false" aria-controls="src-pane-hub" data-srctab="hub">
+        <span class="src-dot" id="src-hub-dot" aria-hidden="true"></span>
+        Hub
+      </button>
+      <button type="button" class="src-tab" role="tab" id="src-tab-plugins" aria-selected="false" aria-controls="src-pane-plugins" data-srctab="plugins">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></svg>
+        Plugins
+        <span id="src-count-plugins" class="src-count" aria-hidden="true"></span>
+      </button>
+    </div>
+    <div id="src-pane-fuentes" class="src-pane" role="tabpanel" aria-labelledby="src-tab-fuentes" tabindex="0">
     <div id="indexes-list" class="indexes-grid-list">
       <p class="no-indexes">No hay índices cargados todavía.</p>
     </div>
@@ -51,24 +68,12 @@
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3M8 7l4-4 4 4"/><path d="M20 16v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2"/></svg>
       Arrastra archivos aquí o pega con <kbd>Ctrl</kbd> + <kbd>V</kbd>
     </p>
-  </div>
-  <div class="index-manager-card hub-card" id="hub-card">
-    <div class="manager-header">
-      <div class="manager-title">
-        <div class="manager-icon" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a1a9b8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="2.5"/></svg>
-        </div>
-        <div>
-          <h3>IndexlyHub <span id="hub-status" class="hub-status">desconectado</span></h3>
-          <p class="manager-desc" id="hub-desc">Explora paquetes de la comunidad</p>
-        </div>
-      </div>
-      <div class="manager-actions">
-        <button type="button" id="hub-collapse" class="collapse-btn" aria-expanded="true" aria-controls="hub-offline hub-online" aria-label="Comprimir IndexlyHub" title="Comprimir">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <button type="button" id="hub-card-btn" class="action-btn secondary">Conectar</button>
-      </div>
+    </div>
+    <div id="src-pane-hub" class="src-pane" role="tabpanel" aria-labelledby="src-tab-hub" tabindex="0" hidden>
+    <div class="src-pane-head">
+      <span id="hub-status" class="hub-status">desconectado</span>
+      <p class="manager-desc" id="hub-desc">Explora paquetes de la comunidad</p>
+      <button type="button" id="hub-card-btn" class="action-btn secondary">Conectar</button>
     </div>
     <div id="hub-offline" class="hub-offline">
       <p>Conecta tu API de IndexlyHub para explorar paquetes populares, ver tus favoritos e importarlos sin salir de aquí.</p>
@@ -88,29 +93,17 @@
       <div id="hub-list" class="hub-list" aria-live="polite"></div>
       <button type="button" id="hub-more" class="load-more-btn" style="display:none">Cargar más</button>
     </div>
-  </div>
-  <div class="index-manager-card plugins-card" id="plugins-card">
-    <div class="manager-header">
-      <div class="manager-title">
-        <div class="manager-icon" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a1a9b8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></svg>
-        </div>
-        <div>
-          <h3>Plugins <span id="plugins-count" class="fuentes-count" aria-live="polite"></span></h3>
-          <p class="manager-desc" id="plugins-desc">Amplía IndexLy con extensiones</p>
-        </div>
-      </div>
-      <div class="manager-actions">
-        <button type="button" id="plugins-collapse" class="collapse-btn" aria-expanded="true" aria-controls="plugins-list" aria-label="Comprimir plugins" title="Comprimir">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <button type="button" id="plugins-add-btn" class="action-btn secondary" onclick="openPluginAddModal()">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          Añadir plugin
-        </button>
-      </div>
+    </div>
+    <div id="src-pane-plugins" class="src-pane" role="tabpanel" aria-labelledby="src-tab-plugins" tabindex="0" hidden>
+    <div class="src-pane-head">
+      <p class="manager-desc" id="plugins-desc">Amplía IndexLy con extensiones</p>
+      <button type="button" id="plugins-add-btn" class="action-btn secondary" onclick="openPluginAddModal()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Añadir plugin
+      </button>
     </div>
     <div id="plugins-list" class="plugins-list" aria-live="polite"></div>
+    </div>
   </div>
   <div id="plugin-tabbar" class="plugin-tabbar" role="group" aria-label="Secciones de plugins" style="display:none"></div>
   <div class="search-wrap">
@@ -1283,9 +1276,11 @@
   }
   function renderIndexesManager() {
     const countEl = document.getElementById("fuentes-count");
+    const srcCountFuentes = document.getElementById("src-count-fuentes");
     const summaryEl = document.getElementById("bulk-summary");
     if (indexes.length === 0) {
       if (countEl) countEl.textContent = "";
+      if (srcCountFuentes) srcCountFuentes.textContent = "";
       indexesListContainer.innerHTML = `<div class="empty-state"><div class="empty-icon">◇</div><p class="no-indexes">Sin fuentes aún<br><span>Sube uno o varios archivos para empezar</span></p><label for="json-input" class="empty-cta"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Añadir tu primer archivo</label></div>`;
       bulkActions.style.display = "none";
       return;
@@ -1293,6 +1288,7 @@
     const totalGames = indexes.reduce((a, i) => a + (i.games ? i.games.length : 0), 0);
     const activeCount = indexes.filter((i) => i.active).length;
     if (countEl) countEl.textContent = `${indexes.length}`;
+    if (srcCountFuentes) srcCountFuentes.textContent = `${indexes.length}`;
     if (summaryEl) summaryEl.textContent = `${indexes.length} ${indexes.length === 1 ? "fuente" : "fuentes"} · ${totalGames.toLocaleString("es-ES")} elementos · ${activeCount === 1 ? "1 activa" : `${activeCount} activas`}`;
     bulkActions.style.display = "flex";
     const groups = new Map();
@@ -1497,6 +1493,28 @@
     applyFuentesCollapsed(fuentesCollapsed);
     collapseBtn.addEventListener("click", () => applyFuentesCollapsed(!fuentesCard.classList.contains("collapsed")));
   }
+  // Pestañas Fuentes / Hub / Plugins — una sola tarjeta (persistente)
+  const srcTabBtns = Array.from(document.querySelectorAll("[data-srctab]"));
+  const srcPanes = {
+    fuentes: document.getElementById("src-pane-fuentes"),
+    hub: document.getElementById("src-pane-hub"),
+    plugins: document.getElementById("src-pane-plugins"),
+  };
+  let srcTab = "fuentes";
+  try { const t = localStorage.getItem("indexly_src_tab"); if (t && srcPanes[t]) srcTab = t; } catch {}
+  function setSrcTab(t) {
+    if (!srcPanes[t]) return;
+    srcTab = t;
+    srcTabBtns.forEach((b) => {
+      const on = b.dataset.srctab === t;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-selected", String(on));
+    });
+    Object.entries(srcPanes).forEach(([k, pane]) => { if (pane) pane.hidden = k !== t; });
+    try { localStorage.setItem("indexly_src_tab", t); } catch {}
+  }
+  srcTabBtns.forEach((b) => b.addEventListener("click", () => setSrcTab(b.dataset.srctab)));
+  setSrcTab(srcTab);
   document.addEventListener("keydown", (e) => {
     const mod = e.metaKey || e.ctrlKey;
     if ((e.key === "/" && document.activeElement !== searchInput && document.activeElement !== mapNameInput && document.activeElement !== hubSearch && document.activeElement !== hubTokenInput && !mod) || (mod && e.key.toLowerCase() === "k")) {
@@ -1520,8 +1538,6 @@
   const hubTokenInput = document.getElementById("hub-token");
   const hubSaveBtn = document.getElementById("hub-save");
   const hubDisconnectBtn = document.getElementById("hub-disconnect");
-  const hubCollapseBtn = document.getElementById("hub-collapse");
-  const hubCard = document.getElementById("hub-card");
   const footerNote = document.getElementById("footer-note");
   const FOOTER_DEFAULT = "Todo se guarda localmente. Nada se envía a servidores.";
   const FOOTER_HUB = "Tus archivos siguen en local. Explorar e importar usa la API de IndexlyHub.";
@@ -1545,6 +1561,8 @@
     }
     if (hubUploadLink) hubUploadLink.style.display = on ? "" : "none";
     if (hubCardBtn) hubCardBtn.textContent = on ? "Cambiar" : "Conectar";
+    const srcHubDot = document.getElementById("src-hub-dot");
+    if (srcHubDot) srcHubDot.classList.toggle("on", on);
     if (hubStatus) { hubStatus.textContent = on ? "conectado" : "desconectado"; hubStatus.classList.toggle("on", on); }
     if (hubDesc) hubDesc.textContent = on ? "Paquetes populares, recientes y tus favoritos" : "Explora paquetes de la comunidad";
     if (hubOffline) hubOffline.style.display = on ? "none" : "";
@@ -1590,22 +1608,6 @@
   if (hubDisconnectBtn) hubDisconnectBtn.addEventListener("click", () => { hubDisconnect(false); closeHubModal(); });
   if (hubTokenInput) hubTokenInput.addEventListener("keydown", (e) => { if (e.key === "Enter") hubSaveBtn.click(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && hubModal.style.display !== "none") closeHubModal(); });
-
-  let hubCollapsed = localStorage.getItem("indexly_hub_collapsed") === "1";
-  function applyHubCollapsed(v) {
-    hubCollapsed = v;
-    hubCard.classList.toggle("collapsed", v);
-    if (hubCollapseBtn) {
-      hubCollapseBtn.setAttribute("aria-expanded", String(!v));
-      hubCollapseBtn.setAttribute("aria-label", v ? "Expandir IndexlyHub" : "Comprimir IndexlyHub");
-      hubCollapseBtn.title = v ? "Expandir" : "Comprimir";
-    }
-    localStorage.setItem("indexly_hub_collapsed", v ? "1" : "0");
-  }
-  if (hubCollapseBtn) {
-    applyHubCollapsed(hubCollapsed);
-    hubCollapseBtn.addEventListener("click", () => applyHubCollapsed(!hubCard.classList.contains("collapsed")));
-  }
 
   async function hubVerifyToken(token) {
     const ctrl = new AbortController();
@@ -2285,10 +2287,8 @@
   // Modelo userscript-style: el plugin se auto-registra con IndexLy.register({setup(ctx)}).
   // El HTML generado por plugins NO pasa por escapeHtml (su responsabilidad); el resto sí.
   const searchRoot = document.querySelector(".Search");
-  const pluginsCard = document.getElementById("plugins-card");
   const pluginsListEl = document.getElementById("plugins-list");
-  const pluginsCountEl = document.getElementById("plugins-count");
-  const pluginsCollapseBtn = document.getElementById("plugins-collapse");
+  const pluginsCountEl = document.getElementById("src-count-plugins");
   const pluginAddModal = document.getElementById("plugin-add-modal");
   const pluginAddConfirm = document.getElementById("plugin-add-confirm");
   const pluginAddError = document.getElementById("plugin-add-error");
@@ -2798,23 +2798,6 @@
     } finally { clearTimeout(timer); }
   }
 
-  // Colapso de la tarjeta de plugins (persistente)
-  let pluginsCollapsed = localStorage.getItem("indexly_plugins_collapsed") === "1";
-  function applyPluginsCollapsed(v) {
-    pluginsCollapsed = v;
-    pluginsCard.classList.toggle("collapsed", v);
-    if (pluginsCollapseBtn) {
-      pluginsCollapseBtn.setAttribute("aria-expanded", String(!v));
-      pluginsCollapseBtn.setAttribute("aria-label", v ? "Expandir plugins" : "Comprimir plugins");
-      pluginsCollapseBtn.title = v ? "Expandir" : "Comprimir";
-    }
-    localStorage.setItem("indexly_plugins_collapsed", v ? "1" : "0");
-  }
-  if (pluginsCollapseBtn) {
-    applyPluginsCollapsed(pluginsCollapsed);
-    pluginsCollapseBtn.addEventListener("click", () => applyPluginsCollapsed(!pluginsCard.classList.contains("collapsed")));
-  }
-
   // Activación de plugins al arrancar (se llama antes del primer render):
   // activa los plugins habilitados y pinta su tarjeta, chips, navbar y footers.
   async function initPlugins() {
@@ -2912,11 +2895,44 @@
   .collapse-btn:hover { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-border-strong); }
   .collapse-btn svg { transition: transform 0.15s ease; }
   .index-manager-card.collapsed .collapse-btn svg { transform: rotate(180deg); }
+  .index-manager-card.collapsed .src-tabs,
+  .index-manager-card.collapsed .src-pane,
   .index-manager-card.collapsed #indexes-list,
   .index-manager-card.collapsed #bulk-actions,
   .index-manager-card.collapsed .drop-hint { display: none; }
   .index-manager-card.collapsed .manager-header { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
   .manager-actions .action-btn.secondary:hover { background: var(--color-surface-raised); color: var(--color-text); }
+  /* Pestañas Fuentes / Hub / Plugins — control segmentado dentro de la tarjeta */
+  .src-tabs {
+    display: flex; gap: 2px; padding: 3px; margin-bottom: var(--space-4);
+    background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 999px;
+  }
+  .src-tab {
+    flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    background: transparent; border: none; color: var(--color-text-tertiary);
+    padding: 8px 12px; border-radius: 999px; font-size: 12px; font-weight: 500; letter-spacing: 0.01em;
+    cursor: pointer; transition: background 0.15s, color 0.15s, box-shadow 0.15s; min-height: 34px; white-space: nowrap;
+  }
+  .src-tab:hover { color: var(--color-text-secondary); background: rgba(255,255,255,0.03); }
+  .src-tab.active { background: #fff; color: #0f172a; font-weight: 600; box-shadow: 0 1px 6px rgba(0,0,0,0.2); }
+  .src-tab:focus-visible { outline: 1px solid var(--color-primary); outline-offset: 2px; }
+  .src-tab svg { flex-shrink: 0; }
+  .src-count {
+    display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px;
+    font-size: 11px; font-weight: 600; font-family: var(--font-mono);
+    color: inherit; background: rgba(127,127,127,0.15); border-radius: 999px;
+  }
+  .src-count:empty { display: none; }
+  .src-tab.active .src-count { background: rgba(15,23,42,0.08); }
+  .src-dot { width: 7px; height: 7px; border-radius: 50%; background: #334155; flex-shrink: 0; }
+  .src-dot.on { background: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); }
+  .src-pane { display: flex; flex-direction: column; min-width: 0; }
+  .src-pane[hidden] { display: none; }
+  .src-pane:focus { outline: none; }
+  .src-pane-head { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
+  .src-pane-head .manager-desc { margin: 0; flex: 1; min-width: 140px; }
+  .src-pane-head .hub-status { flex-shrink: 0; }
+  .src-pane-head .action-btn { margin-left: auto; min-height: 30px; }
   .file-label {
     display: inline-flex;
     align-items: center;
@@ -3086,10 +3102,7 @@
   :global(.pkg-group.collapsed .pkg-chevron svg) { transform: rotate(-90deg); }
   :global(.pkg-children) { display: flex; flex-direction: column; gap: var(--space-2); margin-left: 11px; padding-left: 12px; border-left: 1px solid var(--color-border); }
   :global(.pkg-group.collapsed .pkg-children) { display: none; }
-  /* IndexlyHub — tarjeta con el mismo lenguaje que Fuentes */
-  .hub-card { margin-top: var(--space-4); }
-  .hub-card.collapsed #hub-offline,
-  .hub-card.collapsed #hub-online { display: none; }
+  /* IndexlyHub — dentro de la tarjeta Fuentes (pestaña Hub) */
   .hub-status {
     font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
     color: var(--color-text-tertiary); background: var(--color-bg); border: 1px solid var(--color-border);
@@ -3256,6 +3269,9 @@
     .manager-actions { width: 100%; }
     .manager-actions .file-label { flex: 1 1 100%; justify-content: center; min-height: 42px; }
     .manager-actions .action-btn { min-height: 36px; }
+    .src-tab { min-height: 40px; }
+    .src-pane-head .manager-desc { flex: 1 1 100%; }
+    .src-pane-head .action-btn { margin-left: 0; flex: 1; justify-content: center; min-height: 38px; }
     .drop-hint { text-align: center; }
     .drop-hint kbd { display: none; }
     /* Píldoras de fuente: compactas sin aplastar el switch */
@@ -3416,10 +3432,7 @@
   #confirm-modal .mapping-dialog { max-width: 380px; padding: 20px; gap: 14px; }
   #confirm-modal #confirm-title { font-size: 13px; }
   #confirm-modal #confirm-msg { font-size: 12px; }
-  /* Plugins — tarjeta, modal de instalación y vista de secciones */
-  .plugins-card { margin-top: var(--space-4); }
-  .plugins-card.collapsed #plugins-list { display: none; }
-  .plugins-card.collapsed .manager-header { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  /* Plugins — dentro de la tarjeta Fuentes (pestaña Plugins), modal de instalación y vista de secciones */
   .plugins-list { display: flex; flex-direction: column; gap: var(--space-2); min-height: 36px; }
   /* Plugins — navbar de secciones: pestañas minimalistas sobre una hairline,
      siempre pegado justo encima del buscador. La primera pestaña (Buscador) es fija. */
