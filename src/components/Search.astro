@@ -2209,6 +2209,35 @@
     });
   }
 
+  // Deep-link de API key del Hub (?hub_token=ih_…): guarda la clave y conecta.
+  // Lo usa el botón "Importar a IndexLy" de Mi perfil en el Hub. Si ya había
+  // un token, se sobrescribe (acción explícita del usuario). Limpia la URL
+  // de inmediato para no dejar el secreto en el historial.
+  async function handleHubTokenDeepLink() {
+    let params;
+    try { params = new URLSearchParams(window.location.search); } catch { return; }
+    const t = (params.get("hub_token") || "").trim();
+    if (!t) return;
+    try {
+      const clean = new URL(window.location.href);
+      clean.searchParams.delete("hub_token");
+      history.replaceState(null, "", clean);
+    } catch {}
+    if (!/^ih_[A-Za-z0-9]{30}$/.test(t)) { showToast("Token del Hub inválido", "error"); return; }
+    const hadPrevious = !!hubToken;
+    try {
+      await hubVerifyToken(t);
+      hubToken = t;
+      try { localStorage.setItem("indexly_hub_token", t); } catch {}
+      updateHubUI();
+      hubLoad(true);
+      showToast(hadPrevious ? "API del Hub actualizada desde IndexlyHub" : "API del Hub importada desde IndexlyHub", "success");
+    } catch (err) {
+      console.error(err);
+      showToast(err.name === "AbortError" ? "El Hub no responde (timeout)" : (err.message || "Token no válido"), "error", 5000);
+    }
+  }
+
   // Deep-link del Hub (?import=<url>&name=<slug>&mapping=<json>): descarga y abre el modal de importación normal.
   async function handleHubImport() {
     let params;
@@ -2804,6 +2833,7 @@
     await loadStoredIndexes();
     updateHubUI();
     if (hubToken) hubLoad(true);
+    try { await handleHubTokenDeepLink(); } catch (err) { console.error("[IndexLy] hubTokenDeepLink:", err); }
     handleHubImport();
     try { await handlePluginDeepLink(); } catch (err) { console.error("[IndexLy] pluginDeepLink:", err); }
   })();
