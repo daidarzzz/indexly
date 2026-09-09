@@ -1064,7 +1064,7 @@
     mappingModal.setAttribute("aria-hidden", "false");
     setTimeout(() => mapNameInput.focus(), 50);
   };
-  // Checkboxes de flags registradas por plugins (ej. "es de streaming" del plugin Streaming)
+  // Switches de flags registradas por plugins (ej. "es de streaming" del plugin Streaming)
   function renderMappingFlags(idx) {
     const wrap = document.getElementById("map-flags");
     if (!wrap) return;
@@ -1073,30 +1073,45 @@
     if (!flags.length) { wrap.style.display = "none"; return; }
     wrap.style.display = "flex";
     for (const f of flags) {
-      const label = document.createElement("label");
-      label.className = "plx-flag-label";
-      const cb = document.createElement("input");
-      cb.type = "checkbox";
-      cb.dataset.plxflag = f.id;
-      cb.checked = !!(idx.flags && idx.flags[f.id]);
-      label.appendChild(cb);
+      const row = document.createElement("div");
+      row.className = "plx-flag-row";
+      const txtWrap = document.createElement("div");
+      txtWrap.className = "plx-flag-txt";
       const txt = document.createElement("span");
       txt.textContent = f.label;
-      label.appendChild(txt);
+      txtWrap.appendChild(txt);
       if (f.hint) {
         const hint = document.createElement("small");
         hint.textContent = f.hint;
-        label.appendChild(hint);
+        txtWrap.appendChild(hint);
       }
-      wrap.appendChild(label);
+      row.appendChild(txtWrap);
+      const sw = document.createElement("button");
+      sw.type = "button";
+      sw.className = "index-switch";
+      sw.setAttribute("role", "switch");
+      sw.dataset.plxflag = f.id;
+      const on = !!(idx.flags && idx.flags[f.id]);
+      sw.setAttribute("aria-checked", on ? "true" : "false");
+      sw.setAttribute("aria-label", f.label);
+      const knob = document.createElement("span");
+      knob.className = "knob";
+      knob.setAttribute("aria-hidden", "true");
+      sw.appendChild(knob);
+      sw.addEventListener("click", () => sw.setAttribute("aria-checked", sw.getAttribute("aria-checked") === "true" ? "false" : "true"));
+      row.appendChild(sw);
+      wrap.appendChild(row);
     }
   }
   function readMappingFlags(idx) {
     const wrap = document.getElementById("map-flags");
-    const cbs = wrap ? wrap.querySelectorAll("input[data-plxflag]") : [];
-    if (!cbs.length) return;
+    const els = wrap ? wrap.querySelectorAll("[data-plxflag]") : [];
+    if (!els.length) return;
     const flags = Object.assign({}, idx.flags || {});
-    cbs.forEach(cb => { flags[cb.dataset.plxflag] = cb.checked; });
+    els.forEach(elm => {
+      if (elm.tagName === "INPUT") flags[elm.dataset.plxflag] = elm.checked;
+      else flags[elm.dataset.plxflag] = elm.getAttribute("aria-checked") === "true";
+    });
     idx.flags = flags;
   }
   window.closeMappingModal = function() {
@@ -3480,9 +3495,9 @@
   .plugin-modal-body { font-size: 12.5px; color: #cbd5e1; line-height: 1.55; overflow: auto; max-height: 55vh; }
   /* Flags de plugins en el modal de mapeo (checkboxes inyectados → :global) */
   .map-flags { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: #070a12; border: 1px solid #1e293b; border-radius: 8px; }
-  :global(.plx-flag-label) { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; font-weight: 500; text-transform: none; letter-spacing: 0; color: #cbd5e1; cursor: pointer; user-select: none; }
-  :global(.plx-flag-label input) { accent-color: #0ea5e9; width: 14px; height: 14px; flex-shrink: 0; transform: translateY(1px); cursor: pointer; }
-  :global(.plx-flag-label small) { color: #64748b; font-size: 11px; font-weight: 400; }
+  :global(.plx-flag-row) { display: flex; align-items: center; gap: 10px; }
+  :global(.plx-flag-txt) { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 12.5px; font-weight: 500; color: #cbd5e1; }
+  :global(.plx-flag-txt small) { color: #64748b; font-size: 11px; font-weight: 400; }
   .Search.section-open .search-wrap,
   .Search.section-open .controls,
   .Search.section-open #quota-info,
